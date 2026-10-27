@@ -1,0 +1,16 @@
+{
+  // Browser code. Worker code has its own worker/tsconfig.json (workerd types, no DOM).
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "shared", "test/unit", "test/property"]
+}

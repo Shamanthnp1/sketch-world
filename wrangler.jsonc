@@ -1,0 +1,41 @@
+{
+  "name": "sketch-world",
+  "main": "worker/index.ts",
+  // Newest date the bundled local workerd (1.20261023) supports.
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // No "routes": deploy goes to *.workers.dev only.
+
+  // Vite builds dist/. Unknown paths such as /w/:id fall back to index.html.
+  "assets": {
+    "directory": "./dist/",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/a/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sketch-world-db",
+      // Placeholder until task 11.2 creates the database; a deploy with it fails instead of auto-provisioning.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "sketch-world-assets" }],
+  // namespace_ids 74031–74035 are reserved for sketch-world in the shared account (undo-manual uses 74011–74013).
+  "ratelimits": [
+    { "name": "RL_UNDERSTAND", "namespace_id": "74031", "simple": { "limit": 6, "period": 60 } },
+    { "name": "RL_POINT", "namespace_id": "74032", "simple": { "limit": 6, "period": 60 } },
+    { "name": "RL_SEGMENT", "namespace_id": "74033", "simple": { "limit": 30, "period": 60 } },
+    { "name": "RL_BACKDROP", "namespace_id": "74034", "simple": { "limit": 6, "period": 60 } },
+    { "name": "RL_SAVE", "namespace_id": "74035", "simple": { "limit": 6, "period": 60 } }
+  ],
+  "vars": {
+    "DAILY_COST_CAP_USD": "5",
+    "SAMPLE_WORLD_IDS": ""
+  },
+  // Value comes from .dev.vars locally and `wrangler deploy --secrets-file .dev.vars` when deployed.
+  "secrets": { "required": ["MODEL_API_KEY"] }
+}

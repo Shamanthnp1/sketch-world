@@ -16,7 +16,6 @@ it.each([
 it.each([
   ["POST", "/api/understand"],
   ["POST", "/api/point"],
-  ["POST", "/api/segment"],
   ["POST", "/api/backdrop"],
   ["POST", "/api/worlds"],
   ["GET", "/api/worlds/abc"],

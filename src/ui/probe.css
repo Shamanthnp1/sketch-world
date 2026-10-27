@@ -1,0 +1,41 @@
+/* Gate probe (src/ui/probe.ts). Tokens and shared components come from app.css (DESIGN.md). */
+.pr { overflow-wrap: break-word; }    /* long file names in notes and errors */
+.pr fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: var(--s1); }
+.pr legend { padding: 0; margin-bottom: var(--s1); font-weight: 600; }
+.choice { display: flex; align-items: center; gap: var(--s2); min-height: 44px; font-weight: 400; cursor: pointer; }
+.choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+.choice:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
+.fx { display: grid; gap: var(--s2); padding: 0 0 var(--s2) 26px; }
+.fx label { font-size: 14px; }
+
+/* Figures read as type, not tiles: a caption over a tabular number, with its pass tag beside it. */
+.pr-sum { margin: 0; display: flex; flex-wrap: wrap; gap: var(--s3) var(--s6); }
+.pr-sum dt { font: 500 12px/1.4 var(--font); color: var(--muted); }
+.pr-sum dd { margin: 0; display: flex; align-items: center; gap: var(--s2); min-height: 28px;
+  font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.pr-fig { margin: 0; display: grid; gap: var(--s2); justify-items: start; }
+.pr-fig canvas { display: block; max-width: 100%; max-height: 70vh; border: 1px solid var(--line); border-radius: var(--r-card); }
+
+.pr-objs { display: grid; gap: var(--s3); }
+.pr-obj { display: grid; gap: var(--s3); }
+.pr-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s3); }
+.swatch { flex: none; width: 12px; height: 12px; border-radius: 2px; align-self: center; }
+.pr-thumbs { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.pr-thumbs:empty { display: none; }
+.pr-cut { margin: 0; width: 128px; display: grid; align-content: start; gap: var(--s1); }
+/* Hard-edged checkerboard so transparent pixels show; a pattern, not a colour gradient. */
+.pr-well { width: 128px; height: 128px; display: flex; align-items: center; justify-content: center; border-radius: var(--r-control);
+  background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px; }
+.pr-well img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pr-cut figcaption { font-size: 12px; line-height: 1.4; color: var(--muted); }
+.pr-cut .tag { margin-top: 2px; }
+.pr-why { display: block; color: var(--warn-ink); }
+.pr-ticks { display: flex; flex-wrap: wrap; gap: 0 var(--s5); }
+
+.pr-drawn { display: grid; gap: var(--s2); justify-items: start; }
+.pr-drawn input { width: 120px; min-height: 44px; padding: 0 var(--s3); border: 1px solid var(--line-strong);
+  border-radius: var(--r-control); background: var(--bg); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
+/* A Markdown table row is code: the one place this screen uses --mono. */
+.pr-md { display: block; overflow-x: auto; padding: var(--s3); background: var(--surface); border-radius: var(--r-control);
+  color: var(--ink-2); font: 13px/1.5 var(--mono); white-space: pre; }

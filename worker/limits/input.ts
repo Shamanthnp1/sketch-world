@@ -4,6 +4,7 @@
 //   const box = readBox(form); if (box instanceof Response) return box;
 // Images are never decoded (10 ms CPU budget): size comes from File.size, type from the first 4 bytes.
 import { z } from "zod";
+import { NOUN } from "../../shared/scene"; // Scene_Schema noun rule (Requirement 3.4)
 import { jsonError } from "../http";
 
 export const MAX_IMAGE_BYTES = 400 * 1024;
@@ -12,7 +13,6 @@ const MAX_TEXT_CHARS = 500;                  // global cap for any text field
 const MAX_JSON_BYTES = 64 * 1024;            // default cap for JSON fields (D1 worlds.scene ≤ 64 KB)
 const JPEG = [0xff, 0xd8, 0xff];
 const PNG = [0x89, 0x50, 0x4e, 0x47];
-const NOUN = /^[a-z][a-z -]{0,39}$/;         // Scene_Schema noun rule (Requirement 3.4)
 
 // Not a file → 400; > 400 KB → 413; magic bytes not JPEG or PNG → 415.
 export async function readImage(form: FormData, field: string): Promise<File | Response> {

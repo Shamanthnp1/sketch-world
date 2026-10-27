@@ -1,0 +1,58 @@
+{
+  "top_logprobs": 0,
+  "temperature": 1,
+  "top_p": 1,
+  "service_tier": "auto",
+  "model": "muse-spark-1.3",
+  "reasoning": {
+    "effort": "low"
+  },
+  "background": false,
+  "tools": [],
+  "tool_choice": "auto",
+  "truncation": "disabled",
+  "id": "resp_6ae0b840cf7ac80706d646c1",
+  "object": "response",
+  "status": "completed",
+  "created_at": 1793112128,
+  "completed_at": 1793112128,
+  "error": null,
+  "incomplete_details": null,
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_6ae0b840cf7ac80706d646c1:rs_bd4a2640-0d43-4d58-9850-65b347d9d749",
+      "encrypted_content": "Q-PaDgHQiLE9tgjst4mJkYtfxGFBO1sZd6SqFYL8hHSIwNkkbdkygcUSnfCI_397lRjFUUXP-Sg4RWh6uFP16s4Crncozvp3bRsTjx3YsyfJbah3V7YCQ0JQHljMEjzFzre6FnggzxsbtUA2NVz_BomMOzAncT2_g1KaroP85jJvcifXeakj7-VwtSnYVce6ULzKsg4K9XJcG3qzpr3liUvxGv3AWAuvjp_pKQcloTTpARn2Bxl-YRHUzChrebFORhjjcuyFik-nM-vxlkgfgzGwLJHLOOMpK2s9MuiiXH2-LWDDUhl2fppz7ESXK8l0kqNz25lF_FpQBDjzCtfQoBDbtdXWXMmhSokc332GmUcubTcSqMQX7a7FJu6wR9dbH2IwshlVCSytK6kzGho9QY4ant0aOC4hiqzZXgFG5eoQx4IK6qedS1gOtTgoEDUqAbPNAXrtJ9nzKU1h2Q9XfRhVjwhi8KDzGDvEDjk9DLuxz3uG3SgqvkurBenhLAyoQCHoosbg3085mlJZZW5rT1084JBkMQzI8iPGSYczRU1e7mD-IPQBqFT8HGIPqJ_v0Kxh2pWfj60ov-3p86gN9-KzQfhuCNmhP6MuP4gOPYX0ZXQ99Csn8IMrje09OaMS2W5ildaVDC6cn2VaJjxLmGvOnKmY4xgmwLzyB-pCCap2b1uRypKq55w4OGjwd3LBB8ykW5WjKOfopI0d1pgbIGNAjxsHqErCjXr6-4MYqomH-L7jSQaSnZK4ZYp2RA4Y8qoomqwDm8jHpaa2LmakHILY-BrtZgwN1797KnOCL-jXsyPju0OyU0UL_-251CRdgdHJaU3niAhVW0Oc-R7De01Uq7ZnG4Fs9y1eLHAmbr1-h-RoOqAkh5Mpd10Q_Kevhe3VQtC_XpofCEBj3FTPhBcA56Yho1jKsPj9wOLrJ76yC2APgi5U3N6aQqH9qhD_XjYBt84yQXoqww7rqhmXQmn1oyMnpwj6og8aZjyDFbdmYAOA4P1IX-SVBPRA0s3emYtRyDLomniLku0IaM8AhO2IGd5SNSlkH5IY2wj2z7pxi4vyWr5KjqKPkdW3JoBejZ8ISPkafEnSCxSN0qYLhYWuE7vcOns5CyXEHLLdVAKn4jp95ymtiDGC9KCUvxy-KCCrFqJmrk2CncWz9mj74OyReFGJjGZoLxXVEmOHYs1fbbaK2sC4TGp_y5ySgxMTU_MJVDoKq8os460GnBdC47y-Xc-yGlJVIf-JR8Gmt1z2peT1DvechX665bxGYcD0js-L2Yoq2Go1Dn0fDAzkQRlDUsxMvLTAyPCoKkrctfYEzf4mYXG3D-nS37Z3PwijAI863x4X_eXQhVZY3CNQ8UepSU8YDQ2uGoVvvkRlMXbf5D9quYKcyW-Bl0FrB-K6CECuoG6WPXa0ciAqz12G4nC0tEqA6GdlJlJl4HEwtVo3lDVzNZPjAUgYBH-AhKNVgBkIE8ZDbprPVeaBx2vJyC2JpDUMKg3lV_BOBZqumAhpYQsXXzpBu9SPQw0o-xC1nCdCu4C_uhXD6u1Fn5JD56AZle5R64TcU-LgZPBktzbNGJzdUHqFXb4Pu3sdXRz8puiZdJYnHH6jKS4JJKG0QPZ9mue1KJOrtYB7we9s6fc7fN0qay7DsNS5LFiio_DSqF7xBIqUFRjj8vIZEuibXmZOZ4-DsjOe1XcmHLhtsU4bpYna8A8dqK2JIAZ7tdhXmAT5gFbPcWwqh8PUhC6uIvqfywMOeepX10m1-ZxJ2SYoezml53Ok9QuFZEwsuBUYazTfdtJXbIBC6A1cotJFQpp4lJWRxtsb2Y_Kd1SD6g20fzady_MJbNPnlqKpGhufuua01xjbrJvjE_hEPNfG16tEoIKTCKd0lblDsQ86TDHhbc6GUt6RON-lKdx5BdS10nuFKpGTOqblUW-k1xX_EjN66hj38x0hHhqEmw5ZGDlw_OnYA2MuroNFCtGQypAxOzz31mEQSCPqduKkwhKeZAGeKtQStAuPS2MXXtryRgMcUDziWT8MO7CBitkUQ3XZs4Sywp1ecLMkVze1qkJn1gK_ANLTE8DPEZXAMDB8Qmi-cnPW0flemirCbPAM6XsKU8EjreeRswTP7XPnv0X2fjR00UQKU03GwP5tS6GNnOtu_IGe33WkO9CXpIMP5IgCxQfafdvgqUwuWN14A0_01GBIbarAafR3NJyv1Rtux59B1xWbmcg4WGlbsrtIEMbyMKICV-lUf58HgmMARyoVjPHxCmAobKyXfnERUew1ZKygf2S-2b3VMyuzcPGi_4lMsKN6WtjDLWkvWPFvedtRJ-2r37RpFozSQ0yf1ZDPiQhkuSdPZPJpgoFgRZiTaQwHs9GzVtVoScc0bJYHYjftoqEQVaBxTU33Nx8LO7g5ZeZUnYBgrkVoypATgS_D85Eg6YsNuWVwPvfPxDPg0i3oFzh1zROCbXpJYnV8Iezlsx7d_3zn34WbwBo7oOIOALWoZVFyEq5Hwl4jfQ8x0RuQ45tODYOySiFw3349ff4Tz_ETJ4QjEOH1wmmbPjMMP2OXBap0Fi6RSPUc2pn1qql4zisoSaDBumfd5lWMyfKeH1zGJJQowNPjOAlITijcziOW64GhT51gK2ZoufVezgl2q9S-zpCjoz2u1-NcK_vqhtA8_S72oX5S959xwUefqXe8G5SwveU8-kOXK0QyOcRvWpV5V-dsaPnG9iDVtFq7z9Tafln7-dW5MUZ7A2SGrjZd5LjVSKA4r8MB-JlpVTwwMs9-54gdA763JM9_feQ",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "msg_d98f23f1-7164-45c2-89ad-655a8c894cc1",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "ok",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "status": "completed"
+    }
+  ],
+  "instructions": null,
+  "usage": {
+    "input_tokens": 15,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 222,
+    "output_tokens_details": {
+      "reasoning_tokens": 212
+    },
+    "total_tokens": 237
+  },
+  "parallel_tool_calls": true,
+  "store": false
+}

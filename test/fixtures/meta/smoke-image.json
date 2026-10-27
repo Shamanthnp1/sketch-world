@@ -1,0 +1,55 @@
+{
+  "model": "muse-image-1.0",
+  "id": "resp_6ae0b84e16df683ac436487b",
+  "object": "response",
+  "status": "completed",
+  "created_at": 1793112142,
+  "error": null,
+  "incomplete_details": null,
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_6ae0b84e418a4969a7794421",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "**Drafting pencil sketch scene**\nI'm planning a simple black-and-white pencil sketch of a sky with two clouds, using a hand-drawn paper style and a 3:2 aspect ratio."
+        }
+      ],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "msg_6ae0b84e7295293dde4a47b5",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "status": "completed"
+    },
+    {
+      "type": "image_generation_call",
+      "id": "ig_eyJwZXJtYW5lbnRfdXJsIjoiR1BFUTNEUG5wTHp5TzJzREFCVkRnSmZhRE9FLWJnMWlBUUFEIiwicmVzdW1lX2lkIjoiczoyYzI0MWFjMy1iNTdkLTQ5YzEtODZmNy1lZjhmNGVlYTFjN2M6R0VWRGhqTXpId2dFOXB4bUFQNjFOUjRfZko4MGJnMWlBUUJqIiwiYmluZGluZyI6eyJhcHBfaWQiOjEwODk0ODIxMTcwNDM4MzgsIm1vZGVsIjoibXVzZS1pbWFnZS0xLjAifSwidmVyc2lvbiI6MSwiY3JlYXRlZF9hdCI6MTc5MzExMjE0Mn0.Q8WLFwHw6gFCDXrftJcevZQQ_O4y",
+      "status": "completed",
+      "result": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    }
+  ],
+  "instructions": null,
+  "usage": {
+    "input_tokens": 4014,
+    "input_tokens_details": {
+      "cached_tokens": 3968
+    },
+    "output_tokens": 551,
+    "output_tokens_details": {
+      "reasoning_tokens": 96
+    },
+    "total_tokens": 4565
+  },
+  "parallel_tool_calls": false
+}

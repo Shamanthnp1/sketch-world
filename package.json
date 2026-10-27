@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
     "types": "wrangler types --strict-vars=false",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker"
   },

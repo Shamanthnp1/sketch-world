@@ -14,7 +14,6 @@ it.each([
 });
 
 it.each([
-  ["POST", "/api/understand"],
   ["POST", "/api/point"],
   ["POST", "/api/backdrop"],
   ["POST", "/api/worlds"],

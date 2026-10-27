@@ -2,8 +2,13 @@
 // Prints model, status and latency per call, the API's error code/param/message on failure, and a few
 // non-secret facts: the echoed `store`, SAM masks with their fill of the box, the image's pixel size.
 // Saves each 2xx reply body as test/fixtures/meta/smoke-<spark|sam|image>.json; the image base64 becomes a 1×1 PNG.
+// `npm run smoke -- --understand` makes only one call instead (about $0.01): the exact Spark body that
+// POST /api/understand sends (worker/meta/spark.ts) for the line drawing. It prints the token usage and the
+// scene checked with SparkScene, and saves the reply as test/fixtures/meta/understand-line-drawing.json.
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { decodeMaskToRaster, parseImageStream, recordsOfKind } from "@meta-sam/parser";
+import { runnerImport } from "vite";
 
 const BASE_URL = "https://api.meta.ai/v1";
 const root = new URL("../", import.meta.url);
@@ -32,10 +37,11 @@ async function* events(text) {
   yield { type: "response.completed" };
 }
 
+const textOf = (reply) => reply.output.filter((o) => o.type === "message").flatMap((o) => o.content)
+  .filter((c) => c.type === "output_text").map((c) => c.text).join("");
+
 async function samFacts(reply) {
-  const text = reply.output.filter((o) => o.type === "message").flatMap((o) => o.content)
-    .filter((c) => c.type === "output_text").map((c) => c.text).join("");
-  const { records } = await parseImageStream(events(text)).finalResult;
+  const { records } = await parseImageStream(events(textOf(reply))).finalResult;
   // The raster is H × W of the box, so its mean is the set-pixel fraction of the box.
   return { masks: recordsOfKind(records, "mask").map(({ mask, bounds }) => {
     const raster = decodeMaskToRaster(mask);
@@ -66,6 +72,22 @@ const calls = [
         // The Responses tool rejects "1536x864" ("unknown value"); 1536x1024 is the documented example.
         enable_web_search: false, enable_image_search: false, enable_shell: false, size: "1536x1024" }] } },
 ];
+
+if (process.argv.includes("--understand")) {
+  // Vite loads the Worker's TypeScript modules, so this is the body the route sends, not a copy of it.
+  const load = async (path) => (await runnerImport(fileURLToPath(new URL(path, root)), { configFile: false, logLevel: "silent" })).module;
+  const { sceneBody } = await load("worker/meta/spark.ts");
+  const { SparkScene } = await load("shared/scene.ts");
+  const sceneFacts = (reply) => {
+    let json;
+    try { json = JSON.parse(textOf(reply)); } catch { return { status: reply.status, usage: reply.usage, scene: "not JSON" }; }
+    const parsed = SparkScene.safeParse(json);
+    return { status: reply.status, usage: reply.usage, valid: parsed.success, scene: json,
+      ...(parsed.success ? {} : { issues: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) }) };
+  };
+  calls.splice(0, calls.length, { fixture: "understand-line-drawing.json", facts: sceneFacts,
+    body: { ...sceneBody(png, "image/png"), model: "muse-spark-1.3" } });
+}
 
 async function post(body, timeoutMs) {
   const started = Date.now();

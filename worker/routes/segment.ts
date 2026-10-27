@@ -2,22 +2,14 @@
 // Multipart: `image` (JPEG or PNG, ≤ 400 KB) and exactly one prompt: `noun` (a scene noun) or
 // `box` (PxBox JSON in the image's pixel coordinates, from /api/point).
 import { buildObjectPrompt } from "@meta-sam/parser";
-import { z } from "zod";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readBox, readImage, readNoun } from "../limits/input";
-import { MetaApiError, metaFetch } from "../meta/metaFetch";
+import { metaFetch } from "../meta/metaFetch";
+import { base64, outputText } from "../meta/reply";
 
 // The image plus the prompt field and multipart framing; a larger body is refused before parsing.
 const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 16 * 1024;
-
-// Only what we read from a non-streaming /responses reply: the text sits in message items.
-const SamReply = z.object({
-  output: z.array(z.object({
-    type: z.string(),
-    content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
-  })).default([]),
-});
 
 export async function segment(req: Request, env: Env): Promise<Response> {
   if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) return jsonError(413, "Request body is too large");
@@ -50,16 +42,8 @@ export async function segment(req: Request, env: Env): Promise<Response> {
     },
   });
 
-  const reply = SamReply.safeParse(await res.json().catch(() => null));
-  if (!reply.success) throw new MetaApiError(res.status);    // unreadable reply: same 502 as a failed call
   // No message or empty text means zero matches, which is a valid result.
-  const outputText = reply.data.output
-    .filter((o) => o.type === "message")
-    .flatMap((o) => o.content ?? [])
-    .filter((c) => c.type === "output_text")
-    .map((c) => c.text ?? "")
-    .join("");
-  return Response.json({ outputText });
+  return Response.json({ outputText: await outputText(res) });
 }
 
 // The SAM text prompt: the noun as is, or a box prompt. Both or neither field → 400.
@@ -77,11 +61,4 @@ function promptText(form: FormData, info: ImageInfo): string | Response {
   const bottom = Math.min(Math.ceil(box.y + box.h), info.height);
   if (left >= right || top >= bottom) return jsonError(400, "box does not overlap the image");
   return buildObjectPrompt({ size: info, objects: [{ id: 1, prompts: [{ box: { left, top, right, bottom } }] }] });
-}
-
-// 32 KB chunks keep the argument list small and avoid per-byte string concatenation.
-function base64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
 }

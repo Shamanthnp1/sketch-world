@@ -17,6 +17,9 @@ const GROUP_OF = Object.fromEntries(
 ) as Record<ObjType, Group>;
 export const group = (t: ObjType): Group => GROUP_OF[t];
 
+/** Pixel box in an image's own pixels (Work_Image, or the image sent to SAM). */
+export type PxBox = { x: number; y: number; w: number; h: number };
+
 // ≤ 40 chars; the SAM noun prompt. worker/limits/input.ts readNoun uses the same rule.
 export const NOUN = /^[a-z][a-z -]{0,39}$/;
 

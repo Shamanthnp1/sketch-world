@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ALL_TYPES } from "../../shared/scene";
-import { BOUNCE_H, BOUNCE_T, GLOW, SHIMMER, TWINKLE, bounce, cardLabels, effect } from "../../src/world/build";
+import { BOUNCE_H, BOUNCE_T, GLOW, SHIMMER, TWINKLE, bounce, cardLabels, effect, labelAt } from "../../src/world/build";
 
 const times = Array.from({ length: 400 }, (_, i) => i * 0.037);
 
@@ -50,5 +50,14 @@ describe("cardLabels", () => {
   it("uses the noun, numbering repeated nouns in id order regardless of input order", () => {
     const labels = cardLabels([{ id: 2, noun: "tree" }, { id: 0, noun: "tree" }, { id: 1, noun: "house" }, { id: 3, noun: "tree" }]);
     expect([...labels.entries()].sort((a, b) => a[0] - b[0])).toEqual([[0, "tree 1"], [1, "house"], [2, "tree 2"], [3, "tree 3"]]);
+  });
+});
+
+describe("labelAt", () => {
+  it("sits at the tap, and stays 8 px inside the world near its edges", () => {
+    expect(labelAt(180, 300, 360, 80, 30)).toEqual({ x: 180, y: 300 });
+    expect(labelAt(5, 300, 360, 80, 30).x).toBe(48);   // left edge: 40 + 8
+    expect(labelAt(355, 300, 360, 80, 30).x).toBe(312); // right edge: 360 − 40 − 8
+    expect(labelAt(180, 10, 360, 80, 30).y).toBe(50);   // top: its height + 12 above + 8
   });
 });

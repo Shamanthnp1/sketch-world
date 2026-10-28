@@ -101,6 +101,10 @@ export function resetPositions(cards: readonly Pick<Card, "placed" | "pos">[]): 
 }
 
 // Pure helpers (unit-tested in Node).
+/** The tap label's anchor for a tap at (x, y) in a world `w` wide: the label (lw × lh, centred on x, 12 px above y) stays 8 px inside. */
+export const labelAt = (x: number, y: number, w: number, lw: number, lh: number) =>
+  ({ x: Math.min(Math.max(x, lw / 2 + 8), w - lw / 2 - 8), y: Math.max(y, lh + 20) });
+
 export const BOUNCE_H = 0.4, BOUNCE_T = 0.5;
 /** Hop height s seconds after a tap: one sine arch of height BOUNCE_H over BOUNCE_T, else 0. */
 export const bounce = (s: number) => (s >= 0 && s < BOUNCE_T ? BOUNCE_H * Math.sin((Math.PI * s) / BOUNCE_T) : 0);
@@ -290,10 +294,9 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     const c = pick(cx, cy) as Live | null;
     if (!c) return null;
     label.textContent = c.label; // user strings only via textContent (Requirement 12.4)
-    // Above the pointer, kept 8 px inside the world (the label is centred on `left` and sits 12 px above `top`).
-    const r = host.getBoundingClientRect(), hw = label.offsetWidth / 2 + 8;
-    label.style.left = `${Math.min(Math.max(cx - r.left, hw), r.width - hw)}px`;
-    label.style.top = `${Math.max(cy - r.top, label.offsetHeight + 20)}px`;
+    const r = host.getBoundingClientRect(), at = labelAt(cx - r.left, cy - r.top, r.width, label.offsetWidth, label.offsetHeight);
+    label.style.left = `${at.x}px`;
+    label.style.top = `${at.y}px`;
     label.classList.add("on");
     clearTimeout(hideLabel);
     hideLabel = window.setTimeout(() => label.classList.remove("on"), LABEL_MS);

@@ -2,3 +2,6 @@
 /*
   Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'
   X-Content-Type-Options: nosniff
+# The licence copies are UTF-8 (curly quotes); without a charset, browsers decode text/plain as windows-1252.
+/licenses/*
+  Content-Type: text/plain; charset=utf-8

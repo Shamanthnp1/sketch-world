@@ -143,3 +143,32 @@ Post-deploy smoke, with no model calls (the remote `usage` table has 0 rows afte
 | `GET /api/worlds/abcdefghij` | 404 `{"error":"World not found"}` |
 | `GET /a/w/abcdefghij/thumb.jpg` | 404 `{"error":"Not found"}` |
 | `PUT /api/gallery` | 405 `{"error":"Method not allowed"}`, `Allow: GET` |
+
+## Sample worlds (task 11.3)
+
+Date: 2026-10-28
+
+The user approved three gate drawings as public sample worlds: `1.jpeg`, `ms1.png` and `ms2.png`. Each was made once on the deployed site through the normal Create flow ("Photo of a drawing", privacy notice accepted once), driven by `playwright-cli` in headless Chrome at 1280 × 800, then saved with Save & share, so each save has the server-side safe check row from `/api/understand`. The paper in `1.jpeg` fills the photo, so all three used "Use the whole photo". `ms1.png` is 3346 × 1186 (2.82 : 1), which the corner check refuses (paper shapes 1.0–1.8 : 1), so at the user's choice it went in as a copy padded to 3346 × 1859 (1.8 : 1): its top row (the cream sky) repeated above and its bottom row (the grass) repeated below, the drawing itself unchanged. The copy stays in the gitignored private folder. The owner tokens are kept in the gitignored `test/fixtures/drawings/private/sample-owners.json`, not here.
+
+| World | Drawing | Title | Objects | Calls | Est. cost | World open | Sky | Moves saved |
+|---|---|---|---|---|---|---|---|---|
+| [NjaZ1IphRu](https://sketch-world.shamanthnp.workers.dev/w/NjaZ1IphRu) | 1.jpeg | Underwater sea life | 7: fish ×2, turtle, crab, starfish, seaweed, coral | understand, 6 noun + 1 box segment, point, backdrop | $0.0475 | ≈ 16 s | 22.9 s | crab 1 unit further back |
+| [Tco7s8pREl](https://sketch-world.shamanthnp.workers.dev/w/Tco7s8pREl) | ms1.png (padded) | House with Two Trees | 7: tree ×2, house, cloud ×3, sun | understand, 4 noun segments, backdrop | $0.03 | 9.4 s | 20.0 s | one cloud 1 unit higher |
+| [VcULvxRZQO](https://sketch-world.shamanthnp.workers.dev/w/VcULvxRZQO) | ms2.png | Sunny valley with house and river | 25: tree, mountain ×2, house, river, flower ×10, sun, cloud ×4, bird ×5 | understand, 8 noun + 4 box segments, point, backdrop | $0.06 | 36.8 s | 28.6 s | none |
+
+Times run from Use the whole photo (the understand request) to the open world and to the backdrop reply; saving took 2.4–3.5 s. Every call replied 200. Spend: **$0.1375** at the design.md fixed estimates, which matches the remote `usage` row for the day (137,500 µ$), so no understand retries. Live spend including the gate and its re-check: **$0.3675**.
+
+- **1.jpeg**: Spark listed the same 7 objects as in the 5.9 re-run (rocks and the small shell still missing). "seaweed" got 0 noun masks again and was cut by the point call plus one SAM box prompt; the card includes the rocks under it. The fish and the turtle have sky false, so they stand and wander on the sand instead of floating.
+- **ms1.png**: every object cut out whole by noun, as at the gate. No ground listed.
+- **ms2.png**: the ground is no longer listed as `field` (the 5.9 prompt fix, untested on ms2 until now), but the red dots in the grass are still listed as "flower ×10". They got 0 noun masks, so the world paid for a point call (13.9 s, most of the 36.8 s) and 4 box calls: 3 box cut-outs about 10 px across and 7 threshold cut-outs that show as small green squares by the river. The front mountain's mask has a tree-shaped hole where the tree covers it.
+- **Checks in a fresh browser context, as a non-owner**: each `/w/<id>` opens with all its cut-outs (7, 7 and 25 PNGs), the painted sky (`backdrop.jpg` 200) and only Share link and Make your own (no Save positions or Delete world). Reset positions reports the saved moves on the two worlds that have them ("Nothing has been moved yet" on ms2), and no model or save request is sent. The Gallery lists all three with 640 × 400 thumbnails; none is blank.
+- **`SAMPLE_WORLD_IDS`** = `NjaZ1IphRu,Tco7s8pREl,VcULvxRZQO`. Home's "Walk a sample world" opens the first. It goes first because it is the one drawing on paper, its crayon cut-outs look most like the paper pop-up the site promises, and the starfish and crab already stand near the spawn point. ms1 is the cleanest but its house and trees lie flat until you walk in; ms2 has the flower squares.
+
+Redeployed twice (both approved), static assets and vars only, no new resource:
+
+| Version | Change |
+|---|---|
+| `2f302a6d-4bb7-48cc-b4a7-4923549fc1cb` | `SAMPLE_WORLD_IDS`, the SAM License copy at `/licenses/SAM-LICENSE.txt`, the footer's SAM License link |
+| `e74e84d4-1bfb-4ec4-b78e-3fb73f647df6` | `public/_headers`: `Content-Type: text/plain; charset=utf-8` for `/licenses/*`, since without a charset Chrome decoded the licence's curly quotes as windows-1252 |
+
+Smoke on `e74e84d4`: `GET /api/gallery` lists the 3 worlds and the 3 samples in that order; Home's "Walk a sample world" links `/w/NjaZ1IphRu` and opens it; `/licenses/SAM-LICENSE.txt` is 200 `text/plain; charset=utf-8` with the CSP and `nosniff`, byte-identical to `node_modules/@meta-sam/parser/LICENSE`, and the footer link loads it from an app page; the footer's Source on GitHub link is https://github.com/Shamanthnp1/sketch-world.

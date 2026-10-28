@@ -266,7 +266,7 @@ All three are called through the Meta Model API (Responses API), Standard mode.
 |---|---|
 | This repository | MIT, see [LICENSE](LICENSE) |
 | SAM 3.1 (`sam-3.1`) and its outputs, the masks behind every cut-out | [SAM License](https://huggingface.co/facebook/sam3.1/blob/main/LICENSE) |
-| [`@meta-sam/parser`](https://github.com/meta-models/meta-sam) 0.1.0, bundled into the browser code | [SAM License](https://github.com/meta-models/meta-sam/blob/main/LICENSE) (last updated 19 November 2025) |
+| [`@meta-sam/parser`](https://github.com/meta-models/meta-sam) 0.1.0, bundled into the browser code | SAM License (last updated 19 November 2025): a copy is in [public/licenses/SAM-LICENSE.txt](public/licenses/SAM-LICENSE.txt), served by the site at `/licenses/SAM-LICENSE.txt` and linked from its footer |
 | Muse Spark (`muse-spark-1.3`) and Muse Image (`muse-image-1.0`) | Used through the Meta Model API under its terms; no model weights or model code are in this repo |
 | [three.js](https://github.com/mrdoob/three.js) 0.186 | MIT |
 | [zod](https://github.com/colinhacks/zod) 4 | MIT |

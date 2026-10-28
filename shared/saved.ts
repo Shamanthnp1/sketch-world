@@ -29,6 +29,10 @@ export const Moves = z.record(z.string().regex(/^\d{1,2}$/), Move)
   .refine((m) => Object.keys(m).length <= MAX_MOVES, `moves has more than ${MAX_MOVES} entries`);
 export type Moves = z.output<typeof Moves>;
 
+/** The PATCH /api/worlds/:id body (Requirement 16.7): exactly `{moves}`, which replace the saved ones; `{}` clears them. */
+export const MovesBody = z.strictObject({ moves: Moves });
+export type MovesBody = z.output<typeof MovesBody>;
+
 /**
  * True if every entry names an Instance (by String(id)) and lies inside the bounds for that Instance's kind
  * (Requirements 16.2, 16.3): the same `inBounds` the drag uses, which is false for terrain and non-finite values.

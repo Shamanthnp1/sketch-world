@@ -16,7 +16,7 @@ it.each([
 it("returns 405 with Allow for a known path and the wrong method", async () => {
   const res = await call("PUT", "/api/worlds/abc");
   expect(res.status).toBe(405);
-  expect(res.headers.get("Allow")).toBe("GET, DELETE");
+  expect(res.headers.get("Allow")).toBe("GET, DELETE, PATCH");
   expect(await res.json()).toEqual({ error: "Method not allowed" });
 });
 

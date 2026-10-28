@@ -5,7 +5,7 @@ import { gallery } from "./routes/gallery";
 import { point } from "./routes/point";
 import { segment } from "./routes/segment";
 import { understand } from "./routes/understand";
-import { deleteWorld, getWorld, saveWorld } from "./routes/worlds";
+import { deleteWorld, getWorld, patchWorld, saveWorld } from "./routes/worlds";
 
 type Params = Record<string, string | undefined>;
 type Handler = (req: Request, env: Env, ctx: ExecutionContext, params: Params) => Promise<Response>;
@@ -26,6 +26,7 @@ const ROUTES: Route[] = [
   route("POST", "/api/worlds", saveWorld),
   route("GET", "/api/worlds/:id", getWorld),
   route("DELETE", "/api/worlds/:id", deleteWorld),
+  route("PATCH", "/api/worlds/:id", patchWorld),
   route("GET", "/api/gallery", gallery),
   // R2 keys contain slashes (w/<id>/cut/<n>.png), so the key is the wildcard group "0".
   route("GET", "/a/*", asset),

@@ -19,7 +19,7 @@ const withResult = (result?: string) => ({
   output: fixture.output.flatMap((o): unknown[] => (o.type !== "image_generation_call" ? [o] : result === undefined ? [] : [{ ...o, result }])),
 });
 
-const backdrop = (body: string, headers?: HeadersInit) =>
+const backdrop = (body: BodyInit, headers?: HeadersInit) =>
   exports.default.fetch(new Request("https://example.com/api/backdrop", { method: "POST", body, headers }));
 const ask = (fields: Record<string, unknown> = { title: TITLE, style: "sketch" }) => backdrop(JSON.stringify(fields));
 // Muse Image replies with this body and status to every call. Built inside the mock so the body belongs to the handler's request context.
@@ -111,6 +111,7 @@ it.each<[string, number, string, () => Promise<Response>]>([
   ["an empty title", 400, BAD_BODY, () => ask({ title: "", style: "sketch" })],
   ["a body that is not JSON", 400, BAD_BODY, () => backdrop("title=Town&style=sketch")],
   ["a body over 1 KB", 413, "Request body is too large", () => backdrop(big, { "Content-Length": String(big.length) })],
+  ["a body over 1 KB without Content-Length", 413, "Request body is too large", () => backdrop(new Blob([big]).stream())],
 ])("rejects %s with %i and makes no Muse Image call", async (_, status, error, send) => {
   const fetch = vi.spyOn(globalThis, "fetch");
 

@@ -1,5 +1,5 @@
 // POST /api/worlds through the router, on local D1 and R2. The save → get → delete round trip is in roundtrip.test.ts.
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { jpg, png, save } from "./helpers";    // jpg is used as source, thumb and backdrop; png as each cut-out
 
@@ -113,6 +113,19 @@ it.each<[string, number, () => Record<string, string | File>]>([
 
   expect(res.status).toBe(status);
   expect(typeof (await res.json<{ error: string }>()).error).toBe("string");
+  expect(await stored()).toEqual(before);
+});
+
+it("refuses a streamed body over the size cap without Content-Length with 413 and writes nothing", async () => {
+  const before = await stored();
+  const body = new Blob([new Uint8Array(8 * 1024 * 1024)]).stream();    // over every field cap plus framing (≈ 6.9 MB)
+  const req = new Request("https://example.com/api/worlds", { method: "POST", body, headers: { "Content-Type": "multipart/form-data; boundary=x" } });
+  expect(req.headers.get("Content-Length")).toBeNull();
+
+  const res = await exports.default.fetch(req);
+
+  expect(res.status).toBe(413);
+  expect(await res.json()).toEqual({ error: "Request body is too large" });
   expect(await stored()).toEqual(before);
 });
 

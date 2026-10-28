@@ -6,11 +6,11 @@
 //   backdrop.jpg   JPEG ≤ 400 KB, sent exactly when scene.backdrop is "image"
 //   cut/<n>.png    PNG ≤ 200 KB, long side ≤ 512 px, one per Instance id n
 // Every field once and no others. Images are checked by header bytes only (the Worker never decodes them).
-import { SavedScene, type WorldReply } from "../../shared/saved";
+import { MovesBody, movesValid, SavedScene, type WorldReply } from "../../shared/saved";
 import { randomId, randomToken, sha256Hex, WORLD_ID } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
-import { MAX_CUT_PNG_BYTES, MAX_IMAGE_BYTES, readJsonField } from "../limits/input";
+import { MAX_CUT_PNG_BYTES, MAX_IMAGE_BYTES, parseJson, readBody, readJsonField } from "../limits/input";
 
 const MAX_SCENE_BYTES = 64 * 1024;
 const MAX_THUMB_BYTES = 100 * 1024;
@@ -23,8 +23,10 @@ type Spec = { key: string; cap: number; type: ImageInfo["type"] };
 type Upload = { key: string; bytes: Uint8Array; info: ImageInfo };
 
 export async function saveWorld(req: Request, env: Env): Promise<Response> {
-  if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) return jsonError(413, "Request body is too large");
-  const form = await req.formData().catch(() => null);
+  // Bounded read: a chunked body has no Content-Length to check.
+  const body = await readBody(req, MAX_BODY_BYTES);
+  if (body instanceof Response) return body;
+  const form = await new Response(body, { headers: { "Content-Type": req.headers.get("Content-Type") ?? "" } }).formData().catch(() => null);
   if (!form) return jsonError(400, "Expected a multipart/form-data body");
 
   const raw = readJsonField(form, "scene", MAX_SCENE_BYTES);
@@ -125,6 +127,35 @@ export async function deleteWorld(req: Request, env: Env, _ctx: unknown, { id = 
   } catch (err) {
     console.error(JSON.stringify({ route: "worlds", cleanup: "failed", error: err instanceof Error ? err.name : "unknown" }));
   }
+  return new Response(null, { status: 204 });
+}
+
+const MAX_MOVES_BODY_BYTES = 8 * 1024;
+const BAD_MOVES = "Expected JSON {moves}: at most 30 entries, each naming a movable instance by id, with finite x, y and z inside the bounds for its kind";
+const NOT_OWNER = "Only the device that saved this world can change it";
+
+// PATCH /api/worlds/:id (Requirements 16.7, 16.9–16.11): replaces the world's saved moves; `{moves: {}}` clears them.
+// Checks in order: size (≤ 8 KB → else 413, whatever the token, before any D1 read), owner token (403, the same for an
+// unknown id), body and moves (400). Every check runs before the single UPDATE, so a refused request changes nothing.
+// RL_SAVE is applied in the router (task 10.1).
+export async function patchWorld(req: Request, env: Env, _ctx: unknown, { id = "" }: { id?: string }): Promise<Response> {
+  const body = await readBody(req, MAX_MOVES_BODY_BYTES);
+  if (body instanceof Response) return body;
+  if (!(await isOwner(req, env, id))) return jsonError(403, NOT_OWNER);
+  const parsed = MovesBody.safeParse(parseJson(body));
+  if (!parsed.success) return jsonError(400, BAD_MOVES);
+  const { moves } = parsed.data;
+
+  const row = await env.DB.prepare("SELECT scene FROM worlds WHERE id = ?1").bind(id).first<{ scene: string }>();
+  if (!row) return jsonError(403, NOT_OWNER);    // deleted since the owner check
+  const stored = JSON.parse(row.scene) as SavedScene;    // checked by the SavedScene schema on save
+  if (!movesValid(stored.instances, moves)) return jsonError(400, BAD_MOVES);
+  const next: SavedScene = { ...stored, moves };
+  if (!Object.keys(moves).length) delete next.moves;    // as a save without moves stores it
+  // Guard: the moves were checked above, so a failure here means the stored scene itself is bad (→ 500).
+  const checked = SavedScene.safeParse(next);
+  if (!checked.success) throw new Error("The stored scene is not a valid SavedScene");
+  await env.DB.prepare("UPDATE worlds SET scene = ?1 WHERE id = ?2").bind(JSON.stringify(checked.data), id).run();
   return new Response(null, { status: 204 });
 }
 

@@ -1,6 +1,6 @@
 // Input limits at the trust boundary (Requirements 3.4, 11.4).
-// Pattern: each reader takes the parsed multipart FormData and returns the validated value or a
-// ready {error} Response, which the route returns as is:
+// Pattern: each reader takes the parsed multipart FormData (readBody: the Request) and returns the validated
+// value or a ready {error} Response, which the route returns as is:
 //   const box = readBox(form); if (box instanceof Response) return box;
 // Images are never decoded (10 ms CPU budget): size comes from File.size, type from the first 4 bytes.
 import { z } from "zod";
@@ -34,6 +34,36 @@ export function readText(form: FormData, field: string, cap: number = MAX_TEXT_C
   const max = Math.min(cap, MAX_TEXT_CHARS);
   if (v.length > max) return jsonError(400, `${field} is longer than ${max} characters`);
   return v;
+}
+
+// The raw request body, at most capBytes. A Content-Length over the cap → 413 before reading; a body without one
+// (chunked) is counted as it arrives and → 413 at cap + 1 bytes, so no more than the cap is ever buffered.
+export async function readBody(req: Request, capBytes: number): Promise<Uint8Array | Response> {
+  const tooLarge = () => jsonError(413, "Request body is too large");
+  if (Number(req.headers.get("Content-Length")) > capBytes) return tooLarge();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (req.body) {
+    const reader = req.body.getReader();
+    for (let r = await reader.read(); !r.done; r = await reader.read()) {
+      size += r.value.byteLength;
+      if (size > capBytes) {
+        await reader.cancel();
+        return tooLarge();
+      }
+      chunks.push(r.value);
+    }
+  }
+  return new Uint8Array(await new Blob(chunks).arrayBuffer());
+}
+
+// UTF-8 JSON bytes → the parsed value unchecked (the caller validates it with zod); undefined if not JSON.
+export function parseJson(bytes: Uint8Array): unknown {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return undefined;
+  }
 }
 
 // Multipart field "noun": missing → null; otherwise it must match the Scene_Schema noun rule, else 400.

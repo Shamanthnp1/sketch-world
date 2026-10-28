@@ -3,9 +3,9 @@
 // frame's move is split into sub-steps of length ≤ 0.25 through `step`, and every upright Card's fold is raised
 // with `foldAmount`. No three.js import: the camera comes from the World, so this module stays out of the 3D chunk.
 import type { World } from "./build";
-import { WORLD_BOUNDS, step, walkCircles } from "./collide";
+import { PLAYER_R, WORLD_BOUNDS, step, walkCircles } from "./collide";
 import { foldAmount } from "./popup";
-import type { Vec2 } from "./space";
+import type { Circle, Vec2 } from "./space";
 import "./walk.css";
 
 export const SPEED = 3;                   // units per second
@@ -49,8 +49,15 @@ export function look(v: View, dx: number, dy: number): View {
 /** Distance on the ground plane, for the fold. */
 export const groundDist = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.z - b.z);
 
+/**
+ * The circles the player is not already inside (`step`'s test). Safety net: a Card reset or dropped onto the player
+ * would otherwise make `step` refuse every move; ignoring that circle lets the player walk out.
+ */
+export const clearOf = (circles: readonly Circle[], p: Vec2, pr = PLAYER_R) =>
+  circles.filter((k) => (p.x - k.x) ** 2 + (p.z - k.z) ** 2 >= (k.r + pr) ** 2);
+
 export interface WalkOptions {
-  /** Asked on pointerdown and on every move of a look drag; false leaves that pointer alone (6.12: Card drags). */
+  /** Asked on pointerdown and on every move of a look drag; false leaves that pointer alone. Default: world.canLook (Card drags). */
   canLook?: (e: PointerEvent) => boolean;
 }
 export interface Walk { player(): Vec2; dispose(): void }
@@ -61,7 +68,7 @@ const PAD: readonly [Intent, string, string][] = [
 
 /** Walks `world` from its camera's position; keys work while focus is inside `host` (made focusable if it isn't). */
 export function attachWalk(world: World, host: HTMLElement, opts: WalkOptions = {}): Walk {
-  const { camera } = world, canvas = world.renderer.domElement, canLook = opts.canLook ?? (() => true);
+  const { camera } = world, canvas = world.renderer.domElement, canLook = opts.canLook ?? world.canLook;
   const eye = camera.position.y;
   let p: Vec2 = { x: camera.position.x, z: camera.position.z }, view: View = { yaw: camera.rotation.y, pitch: camera.rotation.x };
   camera.rotation.order = "YXZ"; // yaw about world y, then pitch
@@ -74,10 +81,10 @@ export function attachWalk(world: World, host: HTMLElement, opts: WalkOptions = 
     view = { yaw: view.yaw + turnDir(held) * TURN * dt, pitch: view.pitch };
     const d = walkDelta(held, view.yaw, SPEED * dt);
     if (d.x || d.z) {
-      // Circles at each Card's current home, so a Card moved by a drag (6.12) moves its circle with it.
-      const circles = walkCircles(world.cards.map((c) => ({
+      // Circles at each Card's current home, so a Card moved by a drag moves its circle with it.
+      const circles = clearOf(walkCircles(world.cards.map((c) => ({
         kind: c.kind, type: c.type, collide: c.placed.collide && { ...c.placed.collide, x: c.pos.x, z: c.pos.z },
-      })));
+      }))), p);
       for (const s of substeps(d)) p = step(p, s, circles, WORLD_BOUNDS);
     }
     for (const c of world.cards) if (c.kind === "upright") c.fold = foldAmount(c.fold, groundDist(p, c.pos), world.reducedMotion);

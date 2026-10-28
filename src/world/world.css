@@ -1,6 +1,7 @@
 /* World_View canvas and the tap label (a paper tag, DESIGN.md tokens with fallbacks for the ?probe page). */
 .world { position: relative; overflow: hidden; }
-.world > canvas { display: block; width: 100%; height: 100%; }
+.world > canvas { display: block; width: 100%; height: 100%; cursor: grab; } /* drag a Card to move it, empty space to look */
+.world.dragging > canvas { cursor: grabbing; }
 .world-label {
   position: absolute;
   transform: translate(-50%, calc(-100% - 12px));

@@ -1,4 +1,5 @@
 import { jsonError } from "./http";
+import { rateLimit, type LimitedRoute } from "./limits/rate";
 import { asset } from "./routes/assets";
 import { backdrop } from "./routes/backdrop";
 import { gallery } from "./routes/gallery";
@@ -9,24 +10,26 @@ import { deleteWorld, getWorld, patchWorld, saveWorld } from "./routes/worlds";
 
 type Params = Record<string, string | undefined>;
 type Handler = (req: Request, env: Env, ctx: ExecutionContext, params: Params) => Promise<Response>;
-type Route = { method: string; pattern: URLPattern; handler: Handler };
+type Route = { method: string; pattern: URLPattern; handler: Handler; limit?: LimitedRoute };
 
-const route = (method: string, pathname: string, handler: Handler): Route => ({
+const route = (method: string, pathname: string, handler: Handler, limit?: LimitedRoute): Route => ({
   method,
   pattern: new URLPattern({ pathname }),
   handler,
+  limit,
 });
 
 // Fixed route table (design "Worker routes"). The Worker builds every prompt and picks every model.
+// The last argument names the rate limit checked before the handler (worker/limits/rate.ts); none → unlimited.
 const ROUTES: Route[] = [
-  route("POST", "/api/understand", understand),
-  route("POST", "/api/point", point),
-  route("POST", "/api/segment", segment),
-  route("POST", "/api/backdrop", backdrop),
-  route("POST", "/api/worlds", saveWorld),
+  route("POST", "/api/understand", understand, "understand"),
+  route("POST", "/api/point", point, "point"),
+  route("POST", "/api/segment", segment, "segment"),
+  route("POST", "/api/backdrop", backdrop, "backdrop"),
+  route("POST", "/api/worlds", saveWorld, "save"),
   route("GET", "/api/worlds/:id", getWorld),
   route("DELETE", "/api/worlds/:id", deleteWorld),
-  route("PATCH", "/api/worlds/:id", patchWorld),
+  route("PATCH", "/api/worlds/:id", patchWorld, "save"),
   route("GET", "/api/gallery", gallery),
   // R2 keys contain slashes (w/<id>/cut/<n>.png), so the key is the wildcard group "0".
   route("GET", "/a/*", asset),
@@ -44,6 +47,8 @@ export default {
         continue;
       }
       try {
+        const refused = r.limit && (await rateLimit(env, r.limit, req));
+        if (refused) return refused;
         return await r.handler(req, env, ctx, match.pathname.groups);
       } catch (err) {
         // Matched by name so the router doesn't depend on worker/meta/metaFetch.ts.

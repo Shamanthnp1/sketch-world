@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ALL_TYPES } from "../../shared/scene";
-import { BOUNCE_H, BOUNCE_T, GLOW, SHIMMER, TWINKLE, bounce, cardLabels, effect, labelAt } from "../../src/world/build";
+import {
+  BOUNCE_H, BOUNCE_T, GLOW, SHIMMER, SKY_FAR, SKY_HORIZON, TWINKLE, bounce, cardLabels, effect, labelAt, panoramaUv,
+} from "../../src/world/build";
+import { SKY_R } from "../../src/world/space";
 
 const times = Array.from({ length: 400 }, (_, i) => i * 0.037);
 
@@ -59,5 +62,25 @@ describe("labelAt", () => {
     expect(labelAt(5, 300, 360, 80, 30).x).toBe(48);   // left edge: 40 + 8
     expect(labelAt(355, 300, 360, 80, 30).x).toBe(312); // right edge: 360 − 40 − 8
     expect(labelAt(180, 10, 360, 80, 30).y).toBe(50);   // top: its height + 12 above + 8
+  });
+});
+
+describe("panoramaUv", () => {
+  // three's SphereGeometry: uv.x = u runs once around (u 0.75 faces −z, u 0.5 faces +x); uv.y = 0.5 + elevation / π.
+  // The texture coordinate is repeat · uv + offset; x in image widths (mirrored outside [0, 1]), y in heights from the bottom.
+  const mirror = (s: number) => { const m = ((s % 2) + 2) % 2; return m > 1 ? 2 - m : m; };
+  it.each([[1920, 1280], [1536, 1024], [1024, 1024]])("wraps a %i × %i panorama without a seam, centred ahead, unstretched", (w, h) => {
+    const { repeat, offset } = panoramaUv(w, h), s = (u: number) => repeat.x * u + offset.x, t = (v: number) => repeat.y * v + offset.y;
+    expect(s(0.75)).toBeCloseTo(0.5);                  // the image centre straight ahead
+    expect(s(0.5)).toBeCloseTo(1);                     // its right edge on the right (+x)
+    expect(mirror(s(0))).toBeCloseTo(mirror(s(1)));    // where u wraps, both sides show the same column
+    expect(t(0.5)).toBeCloseTo(SKY_HORIZON);           // the row a third up from the bottom on the horizon
+    expect(t(0.6)).toBeGreaterThan(t(0.5));            // looking up goes up the image
+    // pixels per radian up = pixels per radian across
+    expect(Math.abs(repeat.y / Math.PI) * h).toBeCloseTo(Math.abs(repeat.x / (2 * Math.PI)) * w);
+  });
+  it("puts the sky sphere beyond the sky Cards and inside the camera's far plane", () => {
+    expect(SKY_FAR).toBeGreaterThan(SKY_R);
+    expect(SKY_FAR).toBeLessThan(200);
   });
 });

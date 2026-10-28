@@ -1,11 +1,11 @@
 // The three.js World_View: paper Cards at their layout positions, one requestAnimationFrame loop for motion and
 // effects, tap → label + bounce, and moving Cards by drag (design.md "Browser components", "motion", "placeDrag",
 // Requirements 7.1–7.3, 8.2, 8.3, 12.4, 14.1, 14.8, 15.1–15.11). Load it only through open.ts (dynamic import), so
-// three.js stays out of the first page load. Walking (walk.ts), the HUD (ui/hud.ts) and the sky backdrop (8.2) plug in
-// through World.
+// three.js stays out of the first page load. Walking (walk.ts) and the HUD (ui/hud.ts) plug in through World; the sky
+// is Muse Image's panorama (setSky) or a gradient from the ground colour (Requirements 9.6, 9.7).
 import {
-  CanvasTexture, Color, DoubleSide, Fog, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Raycaster, RingGeometry,
-  Scene, SRGBColorSpace, Vector2, Vector3, WebGLRenderer,
+  BackSide, CanvasTexture, Color, DoubleSide, Fog, Mesh, MeshBasicMaterial, MirroredRepeatWrapping, PerspectiveCamera,
+  PlaneGeometry, Raycaster, RingGeometry, Scene, SphereGeometry, SRGBColorSpace, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import type { ObjType } from "../../shared/scene";
 import type { WorkPixels } from "../cut/chain";
@@ -16,13 +16,14 @@ import { trimToMask } from "../sam/cutout";
 import { motion } from "./animate";
 import { SPAWN, WORLD_BOUNDS, walkCircles } from "./collide";
 import { placeDrag } from "./drag";
+import { KRAFT, meanColour, skyColours } from "./ground";
 import { layout, type Placed } from "./layout";
 import { foldAmount } from "./popup";
 import { SKY_R, type Vec3 } from "./space";
 import "./world.css";
 
 export const EYE = 1.7;              // camera height
-const PAPER = "#e7e2d8", KRAFT = "#d6ccbb", ACCENT = "255 197 51", SHADOW = "52 40 22"; // DESIGN.md tokens
+const ACCENT = "255 197 51", SHADOW = "52 40 22"; // DESIGN.md tokens
 const ACCENT_HEX = 0xffc533, INK_HEX = 0x172331, WHITE = 0xffffff;
 const TEX_MAX = 512;                 // cut-out texture long side (design.md "Performance")
 const BORDER_PX = 4;                 // white paper edge, in Work_Image pixels
@@ -31,6 +32,19 @@ const LIFT_H = 0.25, SKY_LIFT = 0.08; // a dragged Card rises this much (sky Car
 const LIFT_RATE = 14;                // per second: how fast the lift eases in and out
 const RESUME_S = 0.6;                // motion fades back in over this after a drop or Pause motion, so Cards don't jump
 const SHADOW_GROW = 0.35;            // a lifted Card's shadow is this much larger (and lighter)
+export const SKY_FAR = 150;          // sky sphere radius: beyond the sky Cards (SKY_R 40), inside the far plane (200)
+export const SKY_HORIZON = 1 / 3;    // the panorama row, as a fraction of its height from the bottom, on the horizon
+export const SKY_HAZE = 0.06;        // above that row the panorama fades into its horizon colour over this much of its height
+
+/**
+ * Texture repeat and offset that wrap a w × h panorama around the sky sphere's own uvs (u once around, v 0.5 on the
+ * horizon, 1 at the zenith): two copies around, the second mirrored (MirroredRepeatWrapping) so no seam shows; the
+ * image centre straight ahead (−z) with its right side on the right; row SKY_HORIZON on the horizon; as many degrees
+ * per pixel up as across (180° per copy), so it isn't stretched. Texture rows count from the bottom (flipY).
+ */
+export function panoramaUv(w: number, h: number): { repeat: { x: number; y: number }; offset: { x: number; y: number } } {
+  return { repeat: { x: -2, y: w / h }, offset: { x: 2, y: SKY_HORIZON - w / (2 * h) } };
+}
 
 // Pointer presses (Requirements 15.1–15.4).
 export const DRAG_PX = 4;            // mouse and pen: a press on a Card that moves further drags it; any press within it is a tap
@@ -146,7 +160,8 @@ export interface WorldOptions {
   instances: readonly Instance[];
   work: WorkPixels;        // the Work_Image pixels the masks refer to; its size is the layout image size
   reducedMotion: boolean;  // prefers-reduced-motion: every Card upright, no motion, no effects, no bounce
-  ground?: string;         // ground colour, e.g. groundColour() in 8.2; defaults to kraft
+  ground?: string;         // #rrggbb ground colour (groundColour()), also the gradient sky's horizon tint; defaults to kraft
+  sky?: Blob | ImageBitmap; // the backdrop panorama, if it is already here; else the gradient until setSky
 }
 
 export interface World {
@@ -161,6 +176,9 @@ export interface World {
   moves(): Record<string, Vec3>;                             // movesOf(cards), for SavedScene.moves (9.4)
   reset(): void;                                             // Reset positions
   select(card: Card | null): void;                           // Objects panel highlight: accent tint and an ink ring on the ground
+  // The backdrop panorama (an ImageBitmap is the World's to close), or null for the gradient. True once the panorama
+  // shows; false if it can't be decoded (the gradient shows), or a later setSky or dispose came first.
+  setSky(img: Blob | ImageBitmap | null): Promise<boolean>;
   resize(): void;
   dispose(): void;
 }
@@ -190,15 +208,43 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
   label.setAttribute("role", "status");
   host.append(label);
 
-  const scene = new Scene();
-  scene.background = new Color(PAPER);
-  scene.fog = new Fog(PAPER, 24, 70);
+  const scene = new Scene(), tints = skyColours(opts.ground ?? KRAFT), bg = new Color(), fog = new Fog(tints.horizon, 24, 70);
+  scene.background = bg;
+  scene.fog = fog;
   const camera = new PerspectiveCamera(60, 1, 0.1, 200);
   camera.position.set(SPAWN.x, EYE, SPAWN.z); // facing −z, three's default
 
   const ground = new Mesh(new PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: opts.ground ?? KRAFT }));
   ground.position.y = -0.01; // under flat Cards (y 0.01) and Cards folded flat (y 0)
   scene.add(ground);
+
+  // The sky: an inside-out sphere around the camera, drawn first and writing no depth, so everything covers it.
+  const skyMat = new MeshBasicMaterial({ side: BackSide, fog: false, depthWrite: false });
+  const dome = new Mesh(new SphereGeometry(SKY_FAR, 64, 32), skyMat);
+  dome.renderOrder = -1;
+  scene.add(dome);
+  let skyRun = 0, gone = false;
+  /** The panorama, or the gradient for null; the fog and background take its horizon colour, so far Cards fade into the sky. */
+  function showSky(art: ImageBitmap | null): void {
+    const next = art ? panorama(art) : { map: gradient(tints), horizon: tints.horizon };
+    skyMat.map?.dispose();
+    skyMat.map = next.map;
+    skyMat.needsUpdate = true;
+    fog.color.set(next.horizon);
+    bg.set(next.horizon);
+  }
+  async function setSky(img: Blob | ImageBitmap | null): Promise<boolean> {
+    const me = ++skyRun; // an ImageBitmap shows at once (no await), so a sky given to buildWorld is in the first frame
+    const art = img instanceof Blob ? await createImageBitmap(img).catch(() => null) : img;
+    if (me !== skyRun || gone) {
+      art?.close();
+      return false;
+    }
+    showSky(art);
+    return !!art;
+  }
+  showSky(null);
+  if (opts.sky) void setSky(opts.sky);
 
   const shadowGeo = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   const shadowMat = new MeshBasicMaterial({ map: radial(SHADOW, 0.45), transparent: true, depthWrite: false });
@@ -272,6 +318,7 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     }
     ring.visible = !!selected && selected.kind !== "sky";
     if (selected) ring.position.set(selected.pos.x + selected.off.x, 0.03, selected.pos.z + selected.off.z);
+    dome.position.copy(camera.position); // the sky moves with the player: no parallax, and it never comes closer
     renderer.render(scene, camera);
   };
 
@@ -422,10 +469,11 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     scene, camera, renderer, cards, reducedMotion,
     setPaused: (b) => { paused = b; },
     onFrame: (cb) => { hooks.add(cb); return () => hooks.delete(cb); },
-    pick, tap, canLook, place, select, resize,
+    pick, tap, canLook, place, select, setSky, resize,
     moves: () => movesOf(cards),
     reset: () => resetPositions(cards),
     dispose() {
+      gone = true; // a sky still decoding is dropped; the one showing goes with the other maps below
       cancelAnimationFrame(raf);
       clearTimeout(hideLabel);
       if (press) clearTimeout(press.timer);
@@ -482,6 +530,48 @@ function radial(rgb: string, a: number): CanvasTexture {
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   return tex;
+}
+
+/**
+ * The backdrop panorama for the sky sphere (panoramaUv), and its horizon colour: the mean of the tenth of the image
+ * above the horizon row. Over SKY_HAZE above that row the picture fades into that colour, and below it is that colour,
+ * so anything painted across the horizon fades into haze instead of ending on a line where the fogged ground starts.
+ * Closes `art`.
+ */
+function panorama(art: ImageBitmap): { map: CanvasTexture; horizon: string } {
+  const { width: w, height: h } = art, c = canvas(w, h), ctx = c.getContext("2d", { willReadFrequently: true })!;
+  const y = Math.round((1 - SKY_HORIZON) * h), haze = Math.round(SKY_HAZE * h), band = Math.round(0.1 * h);
+  ctx.drawImage(art, 0, 0);
+  art.close();
+  const horizon = meanColour(ctx.getImageData(0, y - band, w, band).data), g = ctx.createLinearGradient(0, y, 0, y - haze);
+  g.addColorStop(0, horizon);
+  g.addColorStop(0.5, `${horizon}50`);
+  g.addColorStop(1, `${horizon}00`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y - haze, w, haze);
+  ctx.fillStyle = horizon;
+  ctx.fillRect(0, y, w, h - y);
+  const map = new CanvasTexture(c), { repeat, offset } = panoramaUv(w, h);
+  map.colorSpace = SRGBColorSpace;
+  map.wrapS = MirroredRepeatWrapping;
+  map.repeat.set(repeat.x, repeat.y);
+  map.offset.set(offset.x, offset.y);
+  return { map, horizon };
+}
+
+/** The gradient sky: the horizon tint at the horizon, SKY_TOP from about 50° up; below the horizon the tint (clamped). */
+function gradient({ horizon, top }: { horizon: string; top: string }): CanvasTexture {
+  const c = canvas(1, 64), ctx = c.getContext("2d")!, g = ctx.createLinearGradient(0, 64, 0, 0);
+  g.addColorStop(0, horizon);
+  g.addColorStop(0.55, top);
+  g.addColorStop(1, top);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1, 64);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  t.repeat.set(1, 2); // the canvas bottom on the horizon (v 0.5), its top at the zenith (v 1)
+  t.offset.set(0, -1);
+  return t;
 }
 
 /** True if the Card picture is opaque at texture uv (v = 1 is the top row), so taps pass through transparent corners. */

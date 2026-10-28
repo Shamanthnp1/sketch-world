@@ -1,0 +1,43 @@
+{
+  "id": "resp_handmade_point_line_drawing",
+  "object": "response",
+  "status": "completed",
+  "model": "muse-spark-1.3",
+  "store": false,
+  "error": null,
+  "incomplete_details": null,
+  "reasoning": {
+    "effort": "low"
+  },
+  "max_output_tokens": 4000,
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_handmade_point_line_drawing",
+      "summary": [],
+      "status": "completed"
+    },
+    {
+      "type": "message",
+      "id": "msg_handmade_point_line_drawing",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"boxes\": [{\"objIndex\": 0, \"box\": {\"x0\": 127, \"y0\": 286, \"x1\": 459, \"y1\": 859}}, {\"objIndex\": 1, \"box\": {\"x0\": 557, \"y0\": 385, \"x1\": 777, \"y1\": 859}}, {\"objIndex\": 2, \"box\": {\"x0\": 801, \"y0\": 91, \"x1\": 947, \"y1\": 281}}]}",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "status": "completed"
+    }
+  ],
+  "usage": {
+    "input_tokens": 900,
+    "output_tokens": 300,
+    "output_tokens_details": {
+      "reasoning_tokens": 220
+    },
+    "total_tokens": 1200
+  }
+}

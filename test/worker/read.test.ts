@@ -1,15 +1,13 @@
 // GET /api/worlds/:id, GET /api/gallery, DELETE /api/worlds/:id and GET /a/:key on local D1 and R2 (task 9.2).
-// Worlds are written straight to D1 and R2 here; the save → get → delete round trip is task 9.3.
+// Worlds are written straight to D1 and R2 here; the save → get → delete round trip is in roundtrip.test.ts.
 // Storage persists between tests, so every test uses fresh ids and checks only its own worlds.
-import { env, exports } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { afterEach, expect, it, vi } from "vitest";
 import type { GalleryReply, SavedInstance, SavedScene, WorldReply } from "../../shared/saved";
 import { randomId, randomToken, sha256Hex } from "../../worker/crypto";
 import { gallery } from "../../worker/routes/gallery";
 import { asset } from "../../worker/routes/assets";
-
-const call = (method: string, path: string, headers?: HeadersInit) =>
-  exports.default.fetch(new Request(`https://example.com${path}`, { method, headers }));
+import { call } from "./helpers";
 
 const inst = (id: number, type: "house" | "tree"): SavedInstance =>
   ({ id, objIndex: id, type, noun: type, sky: false, bbox: { x: 100 + 150 * id, y: 300, w: 120, h: 200 }, source: "sam-noun" });

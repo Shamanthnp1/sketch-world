@@ -1,13 +1,9 @@
-/// <reference types="vite/client" />
-// POST /api/worlds through the router, on local D1 and R2. The full save/read/gallery/delete suite is task 9.3.
-import { env, exports } from "cloudflare:workers";
+// POST /api/worlds through the router, on local D1 and R2. The save → get → delete round trip is in roundtrip.test.ts.
+import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import jpegUrl from "../fixtures/images/world-640.jpg?inline";       // 640 × 360 JPEG, used as source, thumb and backdrop
-import pngUrl from "../fixtures/images/line-drawing.png?inline";     // 512 × 384 PNG, used as each cut-out
+import { jpg, png, save } from "./helpers";    // jpg is used as source, thumb and backdrop; png as each cut-out
 
 const SOURCE_SHA = "77fb4401cbf3134ae82ea8d28ae79eb05634dcd5e8257cf2dc58f28830832271";    // Get-FileHash of world-640.jpg
-const bytes = (dataUrl: string) => Uint8Array.from(atob(dataUrl.split(",")[1]!), (c) => c.charCodeAt(0));
-const jpg = bytes(jpegUrl), png = bytes(pngUrl);
 const padded = (b: Uint8Array, size: number) => { const out = new Uint8Array(size); out.set(b); return out; };    // same header, bigger file
 const hex = async (text: string) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -29,11 +25,6 @@ const fields = (s: ReturnType<typeof scene>): Record<string, string | File> => (
   "backdrop.jpg": new File([jpg], "backdrop.jpg"),
   ...Object.fromEntries(s.instances.map((i) => [`cut/${i.id}.png`, new File([png], `${i.id}.png`)])),
 });
-const save = (f: Record<string, string | File>) => {
-  const body = new FormData();
-  for (const [k, v] of Object.entries(f)) body.append(k, v);
-  return exports.default.fetch(new Request("https://example.com/api/worlds", { method: "POST", body }));
-};
 // Everything a save could write: world rows and R2 objects.
 const stored = async () => ({
   worlds: (await env.DB.prepare("SELECT COUNT(*) AS n FROM worlds").first<{ n: number }>())!.n,

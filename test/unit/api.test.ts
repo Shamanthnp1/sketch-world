@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, understand } from "../../src/api";
+import { ApiError, point, understand } from "../../src/api";
 
 const img = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" });
 const scene = { title: "Village", view: "side", isDrawing: true, safe: true, objects: [] };
@@ -26,5 +26,25 @@ describe("understand", () => {
     const err = await understand(img).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({ status: 502, message: "Request failed (502)" });
+  });
+});
+
+describe("point", () => {
+  const objects = [{ type: "tree" as const, noun: "tree", count: 2 }];
+
+  it("posts the image and the objects JSON as multipart and returns the boxes", async () => {
+    const boxes = { boxes: [{ objIndex: 0, box: { x0: 127, y0: 286, x1: 459, y1: 859 } }] };
+    reply(Response.json(boxes));
+    expect(await point(img, objects)).toEqual(boxes);
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("/api/point");
+    const body = init!.body as FormData;
+    expect(body.get("image")).toBeInstanceOf(Blob);
+    expect(JSON.parse(body.get("objects") as string)).toEqual(objects);
+  });
+
+  it("rejects a non-2xx reply with an ApiError", async () => {
+    reply(Response.json({ error: "Too many requests" }, { status: 429 }));
+    await expect(point(img, objects)).rejects.toMatchObject({ name: "ApiError", status: 429, message: "Too many requests" });
   });
 });

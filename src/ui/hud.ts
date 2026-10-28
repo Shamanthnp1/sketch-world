@@ -32,14 +32,14 @@ const word = (kind: Placed["kind"], d: Nudge) =>
 
 const HELP_KEY = "sketch-world:help-seen";
 const HELP_KEYS = [
-  "W and S or ↑ and ↓ walk, A and D step sideways, ← and → turn.",
+  "W and S or ↑\u00a0and\u00a0↓ walk, A and D step sideways, ←\u00a0and\u00a0→ turn.",
   "Drag empty space to look around.",
   "Drag an object to move it.",
   "Click an object to see its name.",
   "Objects lists everything: pick one, then move it with the arrow buttons or the arrow keys.",
 ];
 const HELP_TOUCH = [
-  "Hold ↑ or ↓ to walk, ↺ or ↻ to turn.",
+  "Hold ↑\u00a0or\u00a0↓ to walk, ↺\u00a0or\u00a0↻ to turn.",
   "Drag with one finger to look around.",
   "Press and hold an object, then drag it to move it.",
   "Tap an object to see its name.",
@@ -73,8 +73,9 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   saveWhy.id = "hud-save-why";
   saveWhy.hidden = true;
   if (opts.onSave) save.addEventListener("click", opts.onSave);
-  else {
-    Object.assign(save, { disabled: true, title: "Coming soon" });
+  else { // aria-disabled, not disabled: it stays focusable, so keyboard and screen reader users hear why
+    save.title = "Coming soon";
+    save.setAttribute("aria-disabled", "true");
     save.setAttribute("aria-describedby", saveWhy.id);
   }
   bar.append(el("h1", "hud-title", opts.title), objects, pause, reset, help, save, saveWhy);
@@ -97,6 +98,7 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
     sel = c;
     world.select(c);
     for (const [k, b] of rows) b.setAttribute("aria-pressed", String(k === c));
+    if (c) rows.get(c)!.scrollIntoView({ block: "nearest" }); // the list scrolls inside a short panel on phones
     pad.hidden = !c || c.kind === "terrain";
     heights.hidden = c?.kind !== "float";
     still.hidden = c?.kind !== "terrain";
@@ -144,7 +146,8 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   }
   pad.setAttribute("role", "group");
   heights.setAttribute("role", "group");
-  panel.append(heading, el("p", "hud-hint", "Pick one, then move it with the arrows or the arrow keys."), list, pad, heights, still);
+  const hint = world.cards.length ? "Pick one, then move it with the arrows or the arrow keys." : "This world has no objects to move.";
+  panel.append(heading, el("p", "hud-hint", hint), list, pad, heights, still);
   select(null);
 
   objects.addEventListener("click", () => {

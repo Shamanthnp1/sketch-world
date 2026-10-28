@@ -173,6 +173,7 @@ interface Hold {
   id: number; touch: boolean; card: Live | null; x0: number; y0: number; x: number; y: number; t0: number;
   state: Press; far: boolean; timer: number;
   at: Vec3; forward: Vec3; offset: Vec3 | null; // drag surface anchor, camera forward, and Card home − pointer hit
+  dx: number; dy: number;                       // screen shift from the pointer to the point whose ray is cast
 }
 
 export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
@@ -313,7 +314,7 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
   let press: Hold | null = null;
   const forwardV = new Vector3();
   const hitAt = (p: Hold, cx: number, cy: number) => {
-    aim(cx, cy);
+    aim(cx + p.dx, cy + p.dy);
     return dragHit(p.card!.kind, ray.ray.origin, ray.ray.direction, p.at, p.forward);
   };
   function drag(p: Hold): void {
@@ -330,6 +331,15 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     p.at = add(c.pos, c.off); // where the Card shows now, so pausing its motion doesn't make it jump
     camera.getWorldDirection(forwardV);
     p.forward = { x: forwardV.x, y: 0, z: forwardV.z };
+    if (c.kind === "upright" || c.kind === "flat") {
+      // Cast the ground ray through the Card's base, kept at its screen offset from the pointer: a tall Card grabbed
+      // above the horizon has no ground point under the pointer, but its base always has one.
+      const v = forwardV.set(p.at.x, p.at.y, p.at.z).project(camera), r = canvasEl.getBoundingClientRect();
+      if (v.z < 1) { // in front of the camera
+        p.dx = r.left + ((v.x + 1) / 2) * r.width - p.x0;
+        p.dy = r.top + ((1 - v.y) / 2) * r.height - p.y0;
+      }
+    }
     const h0 = hitAt(p, p.x0, p.y0);
     p.offset = finite(h0) ? sub(p.at, h0) : null; // null: set at the first hit, from the home
     c.still = true;
@@ -343,6 +353,7 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     const p: Hold = {
       id: e.pointerId, touch: e.pointerType === "touch", card, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
       t0: performance.now(), state: card ? "wait" : "look", far: false, timer: 0, at: ORIGIN, forward: ORIGIN, offset: null,
+      dx: 0, dy: 0,
     };
     press = p;
     if (!card) return;

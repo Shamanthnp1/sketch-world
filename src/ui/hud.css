@@ -35,14 +35,15 @@
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   transition: background-color 120ms;
 }
-.hud-layer button:hover { background: var(--paper, #e7e2d8); }
+@media (hover: hover) { .hud-layer button:hover { background: var(--paper, #e7e2d8); } } /* no sticky hover after a tap */
 .hud-layer button[aria-pressed="true"] { background: var(--ink, #172331); color: var(--sheet, #fff); }
 .hud-layer button.primary { background: var(--accent, #ffc533); }
-.hud-layer button:disabled { background: none; color: var(--muted, #58524a); cursor: not-allowed; }
+.hud-layer button:disabled, .hud-layer button[aria-disabled="true"] { background: none; color: var(--muted, #58524a); cursor: not-allowed; }
 .hud-layer :focus-visible { outline: 3px solid var(--ink, #172331); outline-offset: 3px; }
 
 /* Objects panel: a paper sheet under the strip; scrolls when the list is long. */
 .hud-panel {
+  display: flex; flex-direction: column;
   width: min(320px, 100%); min-height: 0; overflow: auto; overscroll-behavior: contain;
   padding: 12px 16px 16px;
   border: 1px solid transparent; border-radius: var(--r, 3px);
@@ -51,7 +52,11 @@
 }
 .hud-panel h2 { margin: 0; font: 400 1.125rem/1.2 var(--font-display, "Young Serif", Georgia, serif); }
 .hud-hint { margin: 4px 0 8px; max-width: 65ch; color: var(--muted, #58524a); font-size: 0.875rem; line-height: 1.45; }
-.hud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+/* The list scrolls on its own, so the arrows under it stay in view; the padding leaves room for the focus ring. */
+.hud-list {
+  flex: 0 1 auto; min-height: 100px; overflow: auto; overscroll-behavior: contain;
+  list-style: none; margin: 0 -6px; padding: 6px; display: grid; align-content: start; gap: 2px;
+}
 .hud-list button { width: 100%; justify-content: flex-start; border-radius: var(--r, 3px); font-weight: 500; text-align: start; overflow-wrap: anywhere; }
 .hud-nudge {
   display: grid; grid-template-columns: repeat(3, 48px); grid-template-areas: ". up ." "left down right";
@@ -72,7 +77,7 @@
 
 /* Controls help: a modal paper card on its second sheet. */
 .hud-help {
-  width: min(28rem, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto;
+  width: min(28rem, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; overscroll-behavior: contain;
   padding: 24px;
   border: 1px solid transparent; border-radius: var(--r, 3px);
   background: var(--sheet, #fff); color: var(--ink, #172331);
@@ -86,6 +91,7 @@
 @media (max-width: 599px) {
   .hud { width: 100%; border-radius: 22px; }
   .hud-title { flex-basis: 100%; padding-block: 8px 4px; }
+  .hud button { padding-inline: 10px; } /* three controls to a row at 360 px */
   .hud-panel { width: 100%; }
 }
 @media (forced-colors: active) {

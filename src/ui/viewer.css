@@ -1,0 +1,6 @@
+/* The Viewer at /w/:id (src/ui/viewer.ts; DESIGN.md "Viewer"): the World page layout, as on Create, plus its loading,
+   failed and not-found states. Buttons, .card, .error and .meta come from app.css; the HUD from hud.css. */
+main > .viewer-world { position: fixed; inset: 0; z-index: 10; background: var(--paper); }
+.viewer-msg { width: 100%; max-width: 36rem; }
+/* "Delete this world?": the HUD's help dialog (hud.css .hud-help) with a sentence and two buttons. */
+.viewer-ask p { margin-bottom: var(--s5); }

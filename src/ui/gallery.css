@@ -1,0 +1,3 @@
+/* The Gallery (src/ui/gallery.ts; DESIGN.md "Gallery"): groups of Home's world cards (.strip, .world-card in app.css). */
+.gallery-group { display: grid; gap: var(--s5); }
+.gallery-empty { width: 100%; max-width: 36rem; }

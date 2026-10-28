@@ -1,10 +1,20 @@
 // Home page at / (Requirement 17.6): a paper pop-up book hero, the draw → photo → walk explainer and the gallery
-// strip. Static markup and the app's own SVG drawings only (17.5); dynamic text goes in via textContent (17.18).
-// Nothing here imports three.js (17.14). No inline style attributes, so the page works under the CSP of 12.7.
+// strip, filled from GET /api/gallery. Static markup and the app's own SVG drawings only (17.5); dynamic text goes in
+// via textContent (17.18). Nothing here imports three.js (17.14). No inline style attributes (the CSP of 12.7).
+import type { GalleryReply } from "../../shared/saved";
+import { getGallery } from "../api";
 import "./home.css";
 
-/** One saved world as the gallery strip shows it (task 9.5 maps the GET /api/gallery reply to this). */
+/** One saved world as a gallery card shows it: a GalleryWorld without createdAt. */
 export type GalleryItem = { id: string; title: string; thumb: string };
+
+export const STRIP_MAX = 6;
+/** The Home strip: the sample worlds first, then the newest, each world once, at most `max`. */
+export function stripItems({ samples, worlds }: GalleryReply, max = STRIP_MAX): GalleryItem[] {
+  const seen = new Set<string>();
+  return [...samples, ...worlds].filter((w) => !seen.has(w.id) && !!seen.add(w.id)).slice(0, max)
+    .map(({ id, title, thumb }) => ({ id, title, thumb }));
+}
 
 // Line art of the drawing, shared by the hero and the explainer. Paths carry no fill or stroke, so each <use> styles
 // them: .cut draws the white paper edge of a cut-out, .ink the pen lines on top.
@@ -32,7 +42,7 @@ const SHEET = `<rect class="page" x="44" y="30" width="232" height="174" rx="3" 
 const tag = (x: number, y: number, w: number, text: string) =>
   `<g class="tag"><rect x="${x}" y="${y}" width="${w}" height="24" rx="3"/><text x="${x + w / 2}" y="${y + 17}">${text}</text></g>`;
 
-// shortcut: "Walk a sample world" opens /gallery until task 11.3 fills SAMPLE_WORLD_IDS; then link /w/<a sample id>.
+// "Walk a sample world" opens /gallery until the gallery reply names a sample world; mountHome then links its /w/<id>.
 const HTML = `<div class="home">${ART}
 <section class="hero" aria-labelledby="home-h">
   <div class="wrap">
@@ -40,7 +50,7 @@ const HTML = `<div class="home">${ART}
       <h1 class="display" id="home-h"><span class="line"><span>Walk into</span></span> <span class="line"><span>your drawing</span></span></h1>
       <p class="lede">Draw a scene on paper or right here. <span translate="no">Sketch&nbsp;World</span> cuts out every object and stands it up as a paper
         pop-up world you can walk through.</p>
-      <div class="actions"><a class="btn primary" href="/create">Make a world</a><a class="btn" href="/gallery">Walk a sample world</a></div>
+      <div class="actions"><a class="btn primary" href="/create">Make a world</a><a class="btn hero-sample" href="/gallery">Walk a sample world</a></div>
     </div>
     <div class="hero-art">
       <div class="book-scene" role="img" aria-label="An open pop-up book: a house, a tree, flowers and a person stand up from its pages under the sun, a cloud and a bird">
@@ -124,8 +134,13 @@ export function mountHome(main: HTMLElement): void {
   });
   const pause = main.querySelector<HTMLButtonElement>(".pause-btn")!; // the idle loops run longer than 5 s (WCAG 2.2.2)
   pause.addEventListener("click", () => { pause.ariaPressed = String(scene.classList.toggle("paused")); });
-  // shortcut: empty until task 9.5 loads GET /api/gallery into the strip.
-  renderGalleryStrip(main.querySelector(".gal-strip")!, []);
+  const strip = main.querySelector(".gal-strip")!, sample = main.querySelector<HTMLAnchorElement>(".hero-sample")!;
+  renderGalleryStrip(strip, []);
+  // A failed request keeps the empty state. After leaving Home this fills the detached old elements, which is harmless.
+  getGallery().then((g) => {
+    renderGalleryStrip(strip, stripItems(g));
+    if (g.samples[0]) sample.href = `/w/${encodeURIComponent(g.samples[0].id)}`;
+  }, () => {});
   reveal(main);
 }
 
@@ -136,6 +151,11 @@ export function renderGalleryStrip(host: Element, items: GalleryItem[]): void {
       <p>No shared worlds yet. Save a world and it pops up here, newest first.</p></div>`;
     return;
   }
+  host.replaceChildren(worldCards(items));
+}
+
+/** A ul.strip of a.world-card prints, one per world: a lazy 4:3 thumbnail and the title via textContent. Home and Gallery share it. */
+export function worldCards(items: readonly GalleryItem[]): HTMLUListElement {
   const list = Object.assign(document.createElement("ul"), { className: "strip" });
   for (const item of items) {
     const card = Object.assign(document.createElement("a"), { className: "world-card", href: `/w/${encodeURIComponent(item.id)}` });
@@ -146,7 +166,7 @@ export function renderGalleryStrip(host: Element, items: GalleryItem[]): void {
     li.append(card);
     list.append(li);
   }
-  host.replaceChildren(list);
+  return list;
 }
 
 // Each .reveal block's parts rise in once as it enters the screen; with reduced motion nothing is hidden.

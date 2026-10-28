@@ -4,8 +4,8 @@
 // three.js stays out of the first page load. Walking (walk.ts) and the HUD (ui/hud.ts) plug in through World; the sky
 // is Muse Image's panorama (setSky) or a gradient from the ground colour (Requirements 9.6, 9.7).
 import {
-  BackSide, CanvasTexture, Color, DoubleSide, Fog, Mesh, MeshBasicMaterial, MirroredRepeatWrapping, PerspectiveCamera,
-  PlaneGeometry, Raycaster, RingGeometry, Scene, SphereGeometry, SRGBColorSpace, Vector2, Vector3, WebGLRenderer,
+  BackSide, CanvasTexture, Color, DoubleSide, Fog, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Raycaster,
+  RepeatWrapping, RingGeometry, Scene, SphereGeometry, SRGBColorSpace, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import type { ObjType } from "../../shared/scene";
 import type { WorkPixels } from "../cut/chain";
@@ -35,12 +35,14 @@ const SHADOW_GROW = 0.35;            // a lifted Card's shadow is this much larg
 export const SKY_FAR = 150;          // sky sphere radius: beyond the sky Cards (SKY_R 40), inside the far plane (200)
 export const SKY_HORIZON = 1 / 3;    // the panorama row, as a fraction of its height from the bottom, on the horizon
 export const SKY_HAZE = 0.06;        // above that row the panorama fades into its horizon colour over this much of its height
+export const SKY_BLEND = 1 / 8;      // the panorama's right edge, this much of its width, is crossfaded onto its left edge
 
 /**
  * Texture repeat and offset that wrap a w × h panorama around the sky sphere's own uvs (u once around, v 0.5 on the
- * horizon, 1 at the zenith): two copies around, the second mirrored (MirroredRepeatWrapping) so no seam shows; the
- * image centre straight ahead (−z) with its right side on the right; row SKY_HORIZON on the horizon; as many degrees
- * per pixel up as across (180° per copy), so it isn't stretched. Texture rows count from the bottom (flipY).
+ * horizon, 1 at the zenith): two copies around (RepeatWrapping; panorama() crossfades the edges so the wrap shows no
+ * seam, and a mirrored copy would show a mirror line), the image centre straight ahead (−z) with its right side on the
+ * right; row SKY_HORIZON on the horizon; as many degrees per pixel up as across (180° per copy), so it isn't stretched.
+ * Texture rows count from the bottom (flipY).
  */
 export function panoramaUv(w: number, h: number): { repeat: { x: number; y: number }; offset: { x: number; y: number } } {
   return { repeat: { x: -2, y: w / h }, offset: { x: 2, y: SKY_HORIZON - w / (2 * h) } };
@@ -533,16 +535,26 @@ function radial(rgb: string, a: number): CanvasTexture {
 }
 
 /**
- * The backdrop panorama for the sky sphere (panoramaUv), and its horizon colour: the mean of the tenth of the image
- * above the horizon row. Over SKY_HAZE above that row the picture fades into that colour, and below it is that colour,
+ * The backdrop panorama for the sky sphere (panoramaUv), made to tile (SKY_BLEND), and its horizon colour: the mean of
+ * the tenth of the image above the horizon row. Over SKY_HAZE above that row the picture fades into that colour, and below it is that colour,
  * so anything painted across the horizon fades into haze instead of ending on a line where the fogged ground starts.
  * Closes `art`.
  */
 function panorama(art: ImageBitmap): { map: CanvasTexture; horizon: string } {
-  const { width: w, height: h } = art, c = canvas(w, h), ctx = c.getContext("2d", { willReadFrequently: true })!;
+  const { height: h } = art, k = Math.round(SKY_BLEND * art.width), w = art.width - k;
+  const c = canvas(w, h), ctx = c.getContext("2d", { willReadFrequently: true })!;
   const y = Math.round((1 - SKY_HORIZON) * h), haze = Math.round(SKY_HAZE * h), band = Math.round(0.1 * h);
-  ctx.drawImage(art, 0, 0);
+  ctx.drawImage(art, 0, 0); // its last k columns fall off the canvas…
+  // …and fade in over the first k (opaque at column 0), so the last column runs on into the first: the wrap has no seam.
+  const strip = canvas(k, h), sc = strip.getContext("2d")!, fade = sc.createLinearGradient(0, 0, k, 0);
+  sc.drawImage(art, w, 0, k, h, 0, 0, k, h);
   art.close();
+  fade.addColorStop(0, "#000");
+  fade.addColorStop(1, "#0000");
+  sc.globalCompositeOperation = "destination-in";
+  sc.fillStyle = fade;
+  sc.fillRect(0, 0, k, h);
+  ctx.drawImage(strip, 0, 0);
   const horizon = meanColour(ctx.getImageData(0, y - band, w, band).data), g = ctx.createLinearGradient(0, y, 0, y - haze);
   g.addColorStop(0, horizon);
   g.addColorStop(0.5, `${horizon}50`);
@@ -553,7 +565,7 @@ function panorama(art: ImageBitmap): { map: CanvasTexture; horizon: string } {
   ctx.fillRect(0, y, w, h - y);
   const map = new CanvasTexture(c), { repeat, offset } = panoramaUv(w, h);
   map.colorSpace = SRGBColorSpace;
-  map.wrapS = MirroredRepeatWrapping;
+  map.wrapS = RepeatWrapping;
   map.repeat.set(repeat.x, repeat.y);
   map.offset.set(offset.x, offset.y);
   return { map, horizon };

@@ -1,0 +1,4 @@
+# Workers Static Assets apply these to asset responses only (Requirement 12.7); /api/* and /a/* run the Worker first.
+/*
+  Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'
+  X-Content-Type-Options: nosniff

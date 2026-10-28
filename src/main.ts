@@ -4,6 +4,10 @@ import "./ui/app.css";
 import { startRouter } from "./router";
 import { showPage } from "./ui/shell";
 
+// zod's JIT probes for eval with new Function, which the CSP (script-src falls back to 'self') reports as a violation;
+// jitless skips the probe. This is the object z.config() writes, set here so Home doesn't load zod (it loads with import()).
+((globalThis as { __zod_globalConfig?: { jitless?: boolean } }).__zod_globalConfig ??= {}).jitless = true;
+
 const main = document.getElementById("app")!;
 if (new URLSearchParams(location.search).has("probe")) {
   // The dev tool keeps its pre-redesign look (Requirement 17.13): no site chrome, and tool.css instead of app.css.

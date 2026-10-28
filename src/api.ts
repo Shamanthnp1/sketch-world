@@ -40,11 +40,22 @@ export function saveWorldRequest(form: FormData): Promise<{ id: string; ownerTok
   return post("/api/worlds", form);
 }
 
+/** POST /api/backdrop: Muse Image paints the sky panorama for the world `title`; resolves to the PNG. 422: refused under its content policy, 502: failed. */
+export async function backdrop(title: string, style: "sketch" = "sketch"): Promise<Blob> {
+  const res = await fetch("/api/backdrop", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, style }),
+  });
+  if (!res.ok) throw await apiError(res);
+  return res.blob();
+}
+
 async function post<T>(path: string, body: FormData): Promise<T> {
   const res = await fetch(path, { method: "POST", body });
-  if (!res.ok) {
-    const reply = (await res.json().catch(() => null)) as { error?: unknown } | null;
-    throw new ApiError(res.status, typeof reply?.error === "string" ? reply.error : `Request failed (${res.status})`);
-  }
+  if (!res.ok) throw await apiError(res);
   return (await res.json()) as T;
+}
+
+async function apiError(res: Response): Promise<ApiError> {
+  const reply = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  return new ApiError(res.status, typeof reply?.error === "string" ? reply.error : `Request failed (${res.status})`);
 }

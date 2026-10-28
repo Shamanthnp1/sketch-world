@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, point, understand } from "../../src/api";
+import { ApiError, backdrop, point, understand } from "../../src/api";
 
 const img = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" });
 const scene = { title: "Village", view: "side", isDrawing: true, safe: true, objects: [] };
@@ -46,5 +46,23 @@ describe("point", () => {
   it("rejects a non-2xx reply with an ApiError", async () => {
     reply(Response.json({ error: "Too many requests" }, { status: 429 }));
     await expect(point(img, objects)).rejects.toMatchObject({ name: "ApiError", status: 429, message: "Too many requests" });
+  });
+});
+
+describe("backdrop", () => {
+  it("posts {title, style: sketch} as JSON and returns the PNG", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    reply(new Response(png, { headers: { "Content-Type": "image/png" } }));
+    const blob = await backdrop("House tree and sun");
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(png);
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("/api/backdrop");
+    expect(init).toMatchObject({ method: "POST", headers: { "Content-Type": "application/json" } });
+    expect(JSON.parse(init!.body as string)).toEqual({ title: "House tree and sun", style: "sketch" });
+  });
+
+  it.each([422, 502])("rejects %i with an ApiError", async (status) => {
+    reply(Response.json({ error: `msg ${status}` }, { status }));
+    await expect(backdrop("Village")).rejects.toMatchObject({ name: "ApiError", status, message: `msg ${status}` });
   });
 });

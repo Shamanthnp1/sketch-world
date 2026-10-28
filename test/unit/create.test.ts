@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SparkScene } from "../../shared/scene";
 import { ApiError } from "../../src/api";
-import { errorText, MINIMAL_SCENE, minimalInstances, missingNouns, objectCount, stepNames } from "../../src/ui/create";
+import { errorText, MINIMAL_SCENE, minimalInstances, missingNouns, noteText, objectCount, stepNames } from "../../src/ui/create";
 import { layout } from "../../src/world/layout";
 import { Z_BACK } from "../../src/world/space";
 
@@ -48,6 +48,14 @@ describe("missingNouns", () => {
     const scene = { objects: [obj("tree", 1), obj("sun", 1), obj("tree", 2), obj("cat", 1)] };
     expect(missingNouns(scene, [1, 0, 2])).toEqual(["sun", "tree"]);
     expect(missingNouns(scene, [])).toEqual([]);
+  });
+});
+
+describe("noteText", () => {
+  it("says why a Minimal_Scene can't be saved, lists the nouns not found, and is empty for neither", () => {
+    expect(noteText({ saveable: true, notFound: [] })).toBe("");
+    expect(noteText({ saveable: true, notFound: ["sun", "cat"] })).toBe("Not found in your drawing: sun, cat.");
+    expect(noteText({ saveable: false, notFound: [] })).toMatch(/one card\. This world can’t be saved\.$/);
   });
 });
 

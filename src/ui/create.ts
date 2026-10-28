@@ -17,7 +17,6 @@ import { openWorld } from "../world/open";
 import { attachWalk, type Walk } from "../world/walk";
 import { pickCorners } from "./corners";
 import { mountHud, type Hud } from "./hud";
-import { toast } from "./shell";
 import "./create.css";
 
 /** Σcount: the cut-outs the scene asks for (≤ 30 after capInstances). */
@@ -71,6 +70,14 @@ export function minimalInstances(work: WorkPixels): Instance[] {
   for (let y = 0; y < bbox.h; y++) mask.set(all.subarray((y0 + y) * w + x0, (y0 + y) * w + x0 + bbox.w), y * bbox.w);
   const o = MINIMAL_SCENE.objects[0];
   return [{ id: 0, objIndex: 0, type: o.type, noun: o.noun, sky: o.sky, bbox, mask, source: "threshold" }];
+}
+
+/** The note under the HUD strip: why a Minimal_Scene can't be saved, and the nouns not found; "" for neither. */
+export function noteText(c: Pick<CreatedWorld, "saveable" | "notFound">): string {
+  return [
+    c.saveable ? "" : "We couldn’t tell the things in your drawing apart, so it stands as one card. This world can’t be saved.",
+    c.notFound.length ? `Not found in your drawing: ${c.notFound.join(", ")}.` : "",
+  ].filter(Boolean).join(" ");
 }
 
 /** Everything a made world keeps, for Save & share (9.4, 9.5). Lives in mountCreate's `created` while the world is open. */
@@ -241,15 +248,16 @@ export function mountCreate(main: HTMLElement): () => void {
       scrollTo(0, 0);
     });
     hud.bar.append(another);
-    if (c.notFound.length) {
+    // A paper slip, not a toast: it isn't a confirmation, and it must stay until read (DESIGN.md "Toast").
+    const text = noteText(c);
+    if (text) {
       const note = el("div", "create-note"), ok = el("button", "", "Dismiss");
       ok.type = "button";
       ok.addEventListener("click", () => { note.remove(); host.focus(); });
-      note.append(el("p", "", `Not found in your drawing: ${c.notFound.join(", ")}.`), ok);
+      note.append(el("p", "", text), ok);
       hud.bar.after(note);
     }
-    if (!c.saveable) toast("The drawing reader is busy, so your whole drawing is one card. This world can’t be saved.");
-    live.textContent = `Your world “${c.scene.title}” is open.${c.notFound.length ? ` Not found: ${c.notFound.join(", ")}.` : ""}`;
+    live.textContent = `Your world “${c.scene.title}” is open.${text ? ` ${text}` : ""}`;
   }
 
   // Photo of a drawing: decode (EXIF orientation applied) → corners (Cancel returns here) → flatten → autoLevel.

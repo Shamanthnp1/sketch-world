@@ -1,0 +1,7 @@
+/* Drawing pad (src/pad/pad.ts): the tools above a white paper sheet that keeps the canvas's 4:3 shape at any width. */
+.pad { display: grid; gap: var(--s4); }
+.pad-widths { display: flex; gap: var(--s1); }
+.pad button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+/* No border or padding: toCanvas maps the border box. touch-action: none so a finger draws instead of scrolling. */
+.pad-canvas { display: block; width: 100%; max-width: 1024px; height: auto; border-radius: var(--r); background: var(--sheet);
+  box-shadow: var(--shadow); touch-action: none; -webkit-user-select: none; user-select: none; cursor: crosshair; }

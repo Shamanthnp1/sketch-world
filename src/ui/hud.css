@@ -26,7 +26,7 @@
   overflow-wrap: anywhere; text-wrap: balance;
 }
 
-.hud-layer button {
+.hud-layer button, .hud-layer a.btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-width: 44px; min-height: 44px; margin: 0; padding: 0 16px;
   border: 1px solid transparent; border-radius: 999px;
@@ -36,7 +36,7 @@
   transition: none; /* fills change at once (DESIGN.md Motion: transform and opacity only), also over app.css */
 }
 @media (hover: hover) { /* no sticky hover after a tap */
-  .hud-layer button:hover { background: var(--paper, #e7e2d8); }
+  .hud-layer button:hover, .hud-layer a.btn:hover { background: var(--paper, #e7e2d8); }
   .hud-layer button.primary:not([aria-disabled="true"]):hover { background: color-mix(in srgb, var(--accent, #ffc533) 85%, var(--ink, #172331)); }
 }
 .hud-layer button[aria-pressed="true"] { background: var(--ink, #172331); color: var(--sheet, #fff); }
@@ -70,7 +70,7 @@
 .hud-nudge .hud-down { grid-area: down; }
 .hud-nudge .hud-right { grid-area: right; }
 .hud-heights { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
-.hud-nudge button, .hud-heights button, .hud-help button {
+.hud-nudge button, .hud-heights button, .hud-help button, .hud-help a.btn {
   border-radius: var(--r, 3px);
   box-shadow: var(--shadow, 0 1px 1px rgb(52 40 22 / 0.12), 0 4px 10px -3px rgb(52 40 22 / 0.24));
 }
@@ -89,7 +89,28 @@
 .hud-help::backdrop { background: rgb(23 35 49 / 0.4); } /* ink at 40%; ::backdrop doesn't see page tokens everywhere */
 .hud-help h2 { margin: 0 0 12px; font: 400 1.375rem/1.2 var(--font-display, "Young Serif", Georgia, serif); text-wrap: balance; }
 .hud-help ul { margin: 0 0 24px; padding-left: 1.25em; display: grid; gap: 8px; line-height: 1.5; }
-.hud-help button { min-height: 48px; padding: 0 24px; }
+.hud-help button, .hud-help a.btn { min-height: 48px; padding: 0 24px; }
+.hud-help a.btn { background: var(--sheet, #fff); text-decoration: none; }
+
+/* Share this world: the help card with the link in a paper field, Copy link, Open and Close. */
+.hud-share > p { margin: 0 0 12px; line-height: 1.5; }
+.hud-share label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.9375rem; }
+.hud-share input {
+  width: 100%; min-height: 48px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: var(--r, 3px);
+  background: var(--paper, #e7e2d8); color: var(--ink, #172331); font: 400 1rem/1.2 var(--font, system-ui, sans-serif);
+}
+.hud-share .hud-hint { margin: 8px 0 0; min-height: 1.45em; }
+.hud-share .actions { margin-top: 24px; }
+
+/* The error slip under the strip (showError): an error-coloured paper slip with Dismiss. */
+.hud-note {
+  display: flex; align-items: center; gap: 8px; max-width: min(30rem, 100%); padding: 4px 4px 4px 16px;
+  border: 1px solid transparent; border-radius: var(--r, 3px);
+  background: var(--err-bg, #fbe7e4); color: var(--err-ink, #a3201a);
+  box-shadow: var(--shadow-lift, 0 2px 2px rgb(52 40 22 / 0.1), 0 12px 24px -8px rgb(52 40 22 / 0.34));
+}
+.hud-note p { margin: 0; font-size: 0.875rem; line-height: 1.45; overflow-wrap: anywhere; }
 
 @media (max-width: 599px) {
   .hud { width: 100%; border-radius: 22px; }

@@ -1,5 +1,5 @@
-// Typed fetch wrappers for the Worker's /api routes. /api/segment has its own client (src/sam/client.ts);
-// later tasks add the other routes here.
+// Typed fetch wrappers for the Worker's /api routes. /api/segment has its own client (src/sam/client.ts).
+import type { GalleryReply, Moves, WorldReply } from "../shared/saved";
 import type { ObjType, SparkScene } from "../shared/scene";
 
 /**
@@ -47,6 +47,37 @@ export async function backdrop(title: string, style: "sketch" = "sketch"): Promi
   });
   if (!res.ok) throw await apiError(res);
   return res.blob();
+}
+
+/** GET /api/worlds/:id: a saved world's SavedScene and asset URLs. 404: no such world (or deleted). */
+export async function getWorld(id: string): Promise<WorldReply> {
+  return (await send(`/api/worlds/${encodeURIComponent(id)}`)).json() as Promise<WorldReply>;
+}
+
+/** GET /api/gallery: the 24 latest safe worlds, newest first, and the sample worlds. */
+export async function getGallery(): Promise<GalleryReply> {
+  return (await send("/api/gallery")).json() as Promise<GalleryReply>;
+}
+
+/** PATCH /api/worlds/:id with the Owner_Token: replaces the saved moves ({} clears them). 204; 403 wrong token, 400 bad moves, 413 too large. */
+export async function saveMoves(id: string, token: string, moves: Moves): Promise<void> {
+  await send(`/api/worlds/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ moves }),
+  });
+}
+
+/** DELETE /api/worlds/:id with the Owner_Token. 204; 403 wrong token (or no such world). */
+export async function deleteWorld(id: string, token: string): Promise<void> {
+  await send(`/api/worlds/${encodeURIComponent(id)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+}
+
+export const OFFLINE = "Could not reach the server. Check your connection and try again.";
+
+/** fetch, with a failed request (no network) as ApiError 0 and a non-2xx reply as ApiError, both with a message to show. */
+async function send(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(path, init).catch(() => { throw new ApiError(0, OFFLINE); });
+  if (!res.ok) throw await apiError(res);
+  return res;
 }
 
 async function post<T>(path: string, body: FormData): Promise<T> {

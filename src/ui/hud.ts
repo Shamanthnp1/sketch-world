@@ -1,7 +1,10 @@
-// The HUD over the World_View (design.md "Visual Design", "placeDrag"; Requirements 14.9, 15.12–15.15, 17.9, 17.10):
-// a paper strip with the world title, Objects, Pause motion, Reset positions, Help and Save & share; the Objects panel
-// lists every Card by label, highlights the selected one and nudges it 0.25 through world.place; a controls help
-// dialog opens on the first visit. No three.js here: everything 3D goes through World. User strings via textContent.
+// The HUD over the World_View (design.md "Visual Design", "placeDrag"; Requirements 14.9, 15.12–15.15, 16.6, 17.9,
+// 17.10): a paper strip with the world title, Objects, Pause motion, Reset positions, Help and Save & share; the Objects
+// panel lists every Card by label, highlights the selected one and nudges it 0.25 through world.place; a controls help
+// dialog opens on the first visit. For saved worlds (task 9.5) it also has the share dialog, Save positions for owners
+// and an error slip. No three.js here: everything 3D goes through World. User strings via textContent.
+import type { Moves } from "../../shared/saved";
+import { ApiError } from "../api";
 import type { Card, World } from "../world/build";
 import type { Placed } from "../world/layout";
 import type { Vec3 } from "../world/space";
@@ -46,8 +49,32 @@ const HELP_TOUCH = [
   "Objects lists everything: pick one, then move it with the arrow buttons.",
 ];
 
-export interface HudOptions { title: string; onSave?: () => void } // onSave: task 9.5; without it Save & share is a disabled placeholder
-export interface Hud { bar: HTMLElement; dispose(): void }           // bar: the strip, for page controls such as Close
+export interface HudOptions { title: string; onSave?: () => void } // without onSave, Save & share is disabled: "This world can't be saved"
+export interface Hud {
+  bar: HTMLElement;                    // the strip, for page controls such as Close
+  save: HTMLButtonElement;             // Save & share: the page sets its label and busy state
+  showError(text: string): void;       // a paper slip under the strip (role="alert") with Dismiss; replaces the previous one
+  /** The share dialog for `url`; `open` adds an Open link to `path`, `owner` the note that this device can delete the world. */
+  share(url: string, opts?: { open?: string; owner?: boolean }): void;
+  /**
+   * Save positions (Requirement 16.6), for a saved world this device owns: enabled while the Cards' moves differ from
+   * `saved`; a click sends world.moves() through `send`, whose rejection message shows in the error slip.
+   */
+  offerSavePositions(saved: Moves, send: (moves: Moves) => Promise<void>): void;
+  dispose(): void;
+}
+
+/** The link that opens saved world `id`. */
+export const shareUrl = (origin: string, id: string) => `${origin}/w/${id}`;
+
+/** True if two Moves maps differ in any id or coordinate (exact compare: saved moves round-trip through JSON unchanged). */
+export function movesDiffer(a: Moves, b: Moves): boolean {
+  const ka = Object.keys(a);
+  return ka.length !== Object.keys(b).length || ka.some((k) => {
+    const p = a[k]!, q = b[k];
+    return !q || p.x !== q.x || p.y !== q.y || p.z !== q.z;
+  });
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -65,16 +92,18 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   bar.setAttribute("role", "group");
   bar.setAttribute("aria-label", "World controls");
   const objects = button("Objects"), pause = button("Pause motion"), reset = button("Reset positions");
-  const help = button("Help"), save = button("Save & share", "primary"), saveWhy = el("span", "", "Saving is coming soon");
+  const help = button("Help"), save = button("Save & share", "primary"), saveWhy = el("span", "", "This world can’t be saved");
   objects.setAttribute("aria-expanded", "false");
   objects.setAttribute("aria-controls", "hud-objects");
   pause.setAttribute("aria-pressed", "false");
   pause.hidden = world.reducedMotion; // nothing moves with reduced motion
   saveWhy.id = "hud-save-why";
   saveWhy.hidden = true;
-  if (opts.onSave) save.addEventListener("click", opts.onSave);
+  const onSave = opts.onSave;
+  // The page marks Save & share aria-disabled while it saves; clicks then do nothing.
+  if (onSave) save.addEventListener("click", () => { if (save.getAttribute("aria-disabled") !== "true") onSave(); });
   else { // aria-disabled, not disabled: it stays focusable, so keyboard and screen reader users hear why
-    save.title = "Coming soon";
+    save.title = saveWhy.textContent!;
     save.setAttribute("aria-disabled", "true");
     save.setAttribute("aria-describedby", saveWhy.id);
   }
@@ -196,10 +225,92 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   host.append(layer);
   if (!stored()) dialog.showModal();
 
+  let slip: HTMLElement | null = null;
+  function showError(text: string): void {
+    slip?.remove();
+    const s = (slip = el("div", "hud-note")), p = el("p"), ok = button("Dismiss");
+    p.setAttribute("role", "alert");
+    ok.addEventListener("click", () => { s.remove(); host.focus(); });
+    s.append(p, ok);
+    bar.after(s);
+    p.textContent = text; // after it is in the page, so the alert is announced
+  }
+
+  function share(url: string, o: { open?: string; owner?: boolean } = {}): void {
+    const d = el("dialog", "hud-help hud-share"), h = el("h2", "", "Share this world"), link = el("input");
+    const copy = button("Copy link", "primary"), close = button("Close"), acts = el("div", "actions"), said = el("p", "hud-hint");
+    h.id = "hud-share-h";
+    d.setAttribute("aria-labelledby", h.id);
+    link.id = "hud-share-link";
+    Object.assign(link, { type: "url", readOnly: true, value: url, spellcheck: false });
+    link.addEventListener("focus", () => link.select());
+    const label = Object.assign(el("label", "", "Link"), { htmlFor: link.id });
+    said.setAttribute("role", "status");
+    acts.append(copy);
+    if (o.open) acts.append(Object.assign(el("a", "btn", "Open"), { href: o.open }));
+    acts.append(close);
+    d.append(h, el("p", "", "Anyone with this link can open the world, and it’s listed in the Gallery."), label, link, said);
+    if (o.owner) d.append(el("p", "hud-hint", "This device can delete the world later: open the link here and choose Delete world."));
+    d.append(acts);
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        said.textContent = "Link copied.";
+      } catch { // no Clipboard API (or no permission): select the text so the browser's own Copy takes it
+        link.focus();
+        link.select();
+        said.textContent = "The link is selected. Copy it with your browser’s Copy.";
+      }
+    });
+    close.addEventListener("click", () => d.close());
+    d.addEventListener("keydown", (e) => e.stopPropagation()); // keys stay in the dialog: nothing walks behind it
+    d.addEventListener("close", () => d.remove());
+    layer.append(d);
+    d.showModal();
+  }
+
+  let offPositions = () => {};
+  function offerSavePositions(saved: Moves, send: (moves: Moves) => Promise<void>): void {
+    if (bar.querySelector(".hud-positions")) return;
+    const b = button("Save positions", "hud-positions"), why = el("span", "", "Nothing has moved since the last save");
+    why.id = "hud-positions-why";
+    why.hidden = true;
+    let last = saved, busy = false;
+    const sync = () => {
+      const off = busy || !movesDiffer(world.moves(), last);
+      if ((b.getAttribute("aria-disabled") === "true") === off) return;
+      b.setAttribute("aria-disabled", String(off));
+      if (off && !busy) b.setAttribute("aria-describedby", why.id);
+      else b.removeAttribute("aria-describedby");
+    };
+    b.addEventListener("click", async () => {
+      if (b.getAttribute("aria-disabled") === "true") return;
+      const moves = world.moves();
+      busy = true;
+      b.textContent = "Saving positions…";
+      sync();
+      try {
+        await send(moves);
+        last = moves;
+      } catch (e) {
+        showError(e instanceof ApiError ? e.message : "The positions couldn’t be saved. Try again.");
+      } finally {
+        busy = false;
+        b.textContent = "Save positions";
+        b.removeAttribute("aria-disabled");
+        sync();
+      }
+    });
+    save.before(b, why);
+    offPositions = world.onFrame(sync);
+    sync();
+  }
+
   return {
-    bar,
+    bar, save, showError, share, offerSavePositions,
     dispose() {
       offFrame();
+      offPositions();
       world.select(null);
       layer.remove();
     },

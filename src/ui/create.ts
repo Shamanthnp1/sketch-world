@@ -4,7 +4,7 @@
 // shell.ts loads this module with import(), so Home's entry chunk stays small; three.js stays behind openWorld.
 // The raw photo never leaves the browser: only the Work_Image JPEG is sent. User strings via textContent only.
 import type { SparkScene } from "../../shared/scene";
-import { ApiError, backdrop, understand } from "../api";
+import { ApiError, backdrop, saveMoves, understand } from "../api";
 import { buildInstances, type WorkPixels } from "../cut/chain";
 import { chainIO } from "../cut/io";
 import { thresholdMask } from "../cut/threshold";
@@ -12,12 +12,14 @@ import type { Instance } from "../cut/types";
 import { pixels, workImage } from "../image/encode";
 import { createPad, type Pad } from "../pad/pad";
 import { autoLevel, flatten } from "../paper/flatten";
+import { saveWorld, type Saved } from "../share/save";
 import type { World } from "../world/build";
 import { groundColour } from "../world/ground";
 import { openWorld } from "../world/open";
 import { attachWalk, type Walk } from "../world/walk";
 import { pickCorners } from "./corners";
-import { mountHud, type Hud } from "./hud";
+import { mountHud, shareUrl, type Hud } from "./hud";
+import { toast } from "./shell";
 import "./create.css";
 
 /** Σcount: the cut-outs the scene asks for (≤ 30 after capInstances). */
@@ -288,7 +290,41 @@ export function mountCreate(main: HTMLElement): () => void {
         if (png && created?.world === world && (await world.setSky(png)) && created?.world === world) created.backdrop = png;
       });
     }
-    hud = mountHud(host, world, { title: c.scene.title }); // 9.5: onSave: created.saveable ? () => save(created) : undefined
+    // Save & share (Requirements 10.1, 10.5, 10.12, 16.5): the first click saves; once saved, the button is Share link and
+    // shows the same link again (no second world), and Save positions sends later moves with PATCH (16.6). The URL stays
+    // /create: history.replaceState would leave the router's current path at /create, so its links would go stale.
+    let saved: Saved | null = null;
+    const share = (s: Saved) => hud!.share(shareUrl(location.origin, s.id), { open: s.url, owner: true });
+    async function save(h: Hud): Promise<void> {
+      if (saved) return share(saved);
+      h.save.textContent = "Saving…";
+      h.save.setAttribute("aria-disabled", "true");
+      live.textContent = "Saving your world…";
+      const sent = world.moves(); // what saveWorld sends: it reads moves() before its first await
+      try {
+        saved = await saveWorld({
+          title: c.scene.title, view: c.scene.view, ground, backdrop: created!.backdrop, instances: c.instances, work: c.work,
+          sourceJpeg: c.jpeg, world,
+        });
+      } catch (e) { // the world stays open and playable (10.12)
+        h.save.textContent = "Save & share";
+        h.showError(e instanceof ApiError ? e.message : "This world couldn’t be saved. Try again.");
+        return;
+      } finally {
+        h.save.removeAttribute("aria-disabled");
+        live.textContent = "";
+      }
+      if (created?.world !== world) return; // left while it saved: it is saved, and this device owns it
+      removeEventListener("beforeunload", warn); // it can be opened again from its link
+      h.save.textContent = "Share link";
+      const { id, ownerToken } = saved;
+      h.offerSavePositions(sent, async (moves) => {
+        await saveMoves(id, ownerToken, moves);
+        toast("Positions saved");
+      });
+      share(saved);
+    }
+    hud = mountHud(host, world, { title: c.scene.title, onSave: c.saveable ? () => void save(hud!) : undefined });
     // Make another closes this world for good, so it asks first, in a dialog styled like the HUD's help.
     const another = el("button", "", "Make another"), ask = el("dialog", "hud-help create-ask");
     const askH = el("h2", "", "Make another world?"), acts = el("div", "actions");

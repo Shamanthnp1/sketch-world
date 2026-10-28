@@ -1,6 +1,7 @@
 // Browser client for POST /api/segment, copied from undo-manual. Requests start first-in, first-out with
-// at most 3 in flight (Requirement 4.1; was 1). A 429 waits Retry-After and resends, holding its slot;
-// any other failure rejects, and the caller treats it as a miss for that stage.
+// at most 3 in flight (Requirement 4.1; was 1). A 429 waits (Retry-After, else 2 s, 4 s, 8 s; at most 10 s) and
+// resends, holding its slot, up to 3 times (Requirement 11.3); a 4th 429 or any other failure rejects, and the
+// caller treats it as a miss for that stage.
 //
 // API: client.segment(image, { noun: "house" }) or client.segment(image, { box: { x, y, w, h } }).
 // Exactly one of noun or box is sent; the box is in the image's pixels.
@@ -9,8 +10,8 @@ import { parseSamOutput, type MaskRaster } from "./parse";
 
 export const MAX_IN_FLIGHT = 3;
 const MAX_429_RETRIES = 3;
-const DEFAULT_WAIT_MS = 2_000;   // 429 without a usable Retry-After
-const MAX_WAIT_MS = 60_000;      // the Worker's rate limit window
+const BACKOFF_MS = 2_000;        // 429 without a usable Retry-After: 2 s, then 4 s, then 8 s
+const MAX_WAIT_MS = 10_000;      // the user is watching the progress card: 3 waits stay under 30 s
 
 export type SegmentPrompt = { noun: string; box?: never } | { box: PxBox; noun?: never };
 
@@ -24,10 +25,10 @@ export interface SamClientOptions {
   base?: string;                 // origin of the Worker; "" means same origin
 }
 
-/** Rejection for a non-2xx reply; `status` lets the caller spot 503 {mode: "sample"}. */
+/** Rejection for a non-2xx reply; `status` and `mode` (the reply's {mode}) let the caller spot 503 {mode: "sample"}. */
 export class SegmentError extends Error {
   override name = "SegmentError";
-  constructor(readonly status: number) {
+  constructor(readonly status: number, readonly mode?: string) {
     super(`Segment request failed (${status})`);
   }
 }
@@ -70,10 +71,13 @@ export class SamClient {
       const res = await this.fetch(this.url, { method: "POST", body });
       if (res.status === 429 && retry < MAX_429_RETRIES) {
         await res.body?.cancel();
-        await this.sleep(retryAfterMs(res));
+        await this.sleep(retryWaitMs(res.headers.get("Retry-After"), retry));
         continue;
       }
-      if (!res.ok) throw new SegmentError(res.status);
+      if (!res.ok) {
+        const { mode } = ((await res.json().catch(() => null)) ?? {}) as { mode?: unknown };
+        throw new SegmentError(res.status, typeof mode === "string" ? mode : undefined);
+      }
       const { outputText } = (await res.json()) as { outputText?: unknown };
       if (typeof outputText !== "string") throw new Error("Segment reply has no outputText");
       const ms = performance.now() - started;
@@ -82,8 +86,9 @@ export class SamClient {
   }
 }
 
-// shortcut: delay-seconds only (what our Worker sends); an HTTP-date falls back to the default wait.
-function retryAfterMs(res: Response): number {
-  const s = Number(res.headers.get("Retry-After") ?? NaN);
-  return Number.isFinite(s) && s >= 0 ? Math.min(s * 1000, MAX_WAIT_MS) : DEFAULT_WAIT_MS;
+/** The wait before 429 retry `retry` (0–2): Retry-After seconds if usable, else 2 s · 2^retry; at most 10 s. */
+// shortcut: delay-seconds only (what our Worker sends); an HTTP-date falls back to the backoff.
+export function retryWaitMs(retryAfter: string | null, retry: number): number {
+  const s = Number(retryAfter ?? NaN);
+  return Math.min(Number.isFinite(s) && s >= 0 ? s * 1000 : BACKOFF_MS * 2 ** retry, MAX_WAIT_MS);
 }

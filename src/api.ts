@@ -4,11 +4,12 @@ import type { ObjType, SparkScene } from "../shared/scene";
 
 /**
  * A non-2xx reply. `status` tells the cases apart: 422 not a drawing (show `message`), 429 rate limited,
- * 502 model failed, 503 daily cap (Sample_Mode), 400/413/415 bad input. `message` is the Worker's {error} text.
+ * 502 model failed, 503 daily cap (Sample_Mode), 400/413/415 bad input. `message` is the Worker's {error} text;
+ * `mode` is the reply's {mode} ("sample" with the daily cap's 503).
  */
 export class ApiError extends Error {
   override name = "ApiError";
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly mode?: string) {
     super(message);
   }
 }
@@ -87,6 +88,7 @@ async function post<T>(path: string, body: FormData): Promise<T> {
 }
 
 async function apiError(res: Response): Promise<ApiError> {
-  const reply = (await res.json().catch(() => null)) as { error?: unknown } | null;
-  return new ApiError(res.status, typeof reply?.error === "string" ? reply.error : `Request failed (${res.status})`);
+  const reply = (await res.json().catch(() => null)) as { error?: unknown; mode?: unknown } | null;
+  return new ApiError(res.status, typeof reply?.error === "string" ? reply.error : `Request failed (${res.status})`,
+    typeof reply?.mode === "string" ? reply.mode : undefined);
 }

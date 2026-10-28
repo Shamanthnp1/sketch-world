@@ -277,6 +277,7 @@ export function mountCreate(main: HTMLElement): () => void {
     const askH = el("h2", "", "Make another world?"), acts = el("div", "actions");
     const go = el("button", "primary", "Make another"), stay = el("button", "", "Keep this world");
     another.type = go.type = stay.type = "button";
+    stay.autofocus = true; // the dialog opens on the safe choice
     askH.id = "create-ask-h";
     ask.setAttribute("aria-labelledby", askH.id);
     acts.append(go, stay);

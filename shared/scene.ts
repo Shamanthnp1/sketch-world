@@ -35,8 +35,18 @@ export const SparkSceneBase = z.object({
     sky: z.boolean(),
   })).max(12),
 });
-// Task 5.1 adds .transform(capInstances(30)) here; callers parse with SparkScene, so they don't change.
-export const SparkScene = SparkSceneBase;
+
+/**
+ * Keeps entry order and lowers counts from the last object until Σcount ≤ max (Requirements 3.5, 5.11).
+ * An object lowered to 0 is removed, since count must stay 1–10. Pure: returns a new scene.
+ */
+export const capInstances = (max: number) => (scene: z.output<typeof SparkSceneBase>): z.output<typeof SparkSceneBase> => {
+  let left = max; // walking forward and spending a budget lowers the tail first, same as lowering from the end
+  const objects = scene.objects.map((o) => { const count = Math.min(o.count, left); left -= count; return { ...o, count }; });
+  return { ...scene, objects: objects.filter((o) => o.count > 0) };
+};
+
+export const SparkScene = SparkSceneBase.transform(capInstances(30));
 export type SparkScene = z.output<typeof SparkScene>;
 
 // JSON schema for Spark's text.format. Built from SparkSceneBase because zod can't express a transform in

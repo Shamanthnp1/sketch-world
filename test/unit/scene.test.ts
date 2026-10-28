@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL_TYPES, group, SPARK_SCENE_JSON_SCHEMA, SparkScene, TYPES } from "../../shared/scene";
+import { ALL_TYPES, capInstances, group, SPARK_SCENE_JSON_SCHEMA, SparkScene, TYPES } from "../../shared/scene";
 
 const obj = { type: "tree", noun: "fir tree", count: 2, sky: false };
 const scene = { title: "My village", view: "side", isDrawing: true, safe: true, objects: [obj] };
@@ -60,6 +60,28 @@ describe("SparkScene", () => {
     expect(okObj({ sky: true })).toBe(true);
     expect(okObj({ sky: "no" })).toBe(false);
     expect(ok({ objects: [{ type: "tree", noun: "tree", count: 1 }] })).toBe(false);
+  });
+});
+
+describe("capInstances", () => {
+  const nouns = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
+  const withCounts = (counts: number[]) => ({ ...scene, objects: counts.map((count, i) => ({ ...obj, noun: nouns[i], count })) });
+  const counts = (s: { objects: { noun: string; count: number }[] }) => s.objects.map((o) => [o.noun, o.count]);
+
+  it("leaves a scene with Σcount ≤ 30 unchanged", () => {
+    for (const c of [[], [1], [10, 10, 10], [5, 5, 5, 5, 5, 4]]) expect(SparkScene.parse(withCounts(c))).toEqual(withCounts(c));
+  });
+  it("lowers the last object when Σcount is 31", () => {
+    expect(counts(SparkScene.parse(withCounts([10, 10, 5, 6])))).toEqual([["a", 10], ["b", 10], ["c", 5], ["d", 5]]);
+  });
+  it("removes trailing objects that drop to 0 and keeps the order", () => {
+    expect(counts(SparkScene.parse(withCounts(Array(12).fill(10))))).toEqual([["a", 10], ["b", 10], ["c", 10]]);
+    expect(counts(SparkScene.parse(withCounts([8, 9, 10, 4, 2, 1])))).toEqual([["a", 8], ["b", 9], ["c", 10], ["d", 3]]);
+  });
+  it("is pure and takes any max", () => {
+    const s = SparkScene.parse(withCounts([3, 3, 3]));
+    expect(counts(capInstances(4)(s))).toEqual([["a", 3], ["b", 1]]);
+    expect(s).toEqual(withCounts([3, 3, 3]));
   });
 });
 

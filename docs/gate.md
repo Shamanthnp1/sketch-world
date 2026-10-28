@@ -97,3 +97,21 @@ Single drawings below a bar: 1.jpeg is at 55% clean (bar 70%). No drawing is bel
 - **Objects Spark didn't list** (rainbow in 2.jpeg and 3.jpeg, rocks in 1.jpeg, grass tuft in 3.jpeg). Handled: nothing; the chain only sees listed objects, so they don't even appear as "not found". Not handled: needs an understand-prompt change, outside task 5.
 - **Decorations and ground listed** (sparkle stars in 2.jpeg and 3.jpeg, ground as `field` in all 3 PNGs, grass dots as "flower ×10" in ms2). Handled: `field` gets the 90% bbox allowance, so ground cuts stay as terrain. Not handled: clean decoration cuts become extra instances, and a 0-mask decoration noun (ms2 "flower ×10") would trigger the point call plus up to 10 box calls ($0.035) and threshold cuts of grass dots.
 - **Cost headroom.** The gate figures cover understand + noun SAM only. A world adds the backdrop ($0.01) and any point/box calls: 3.jpeg would be about $0.065 (backdrop, point, 2 bush boxes), ms2 up to $0.0775. Task 5 has no per-world limit on box calls.
+
+## Re-check after the scene-prompt fix (task 5.9)
+
+Date: 2026-10-28
+
+Change: `rainbow` is now a sky type, and the scene prompt tells Spark to skip decorations (sparkles, dots, texture strokes) and the ground, sky or background itself, and to list rainbows. Same setup as the gate (local `wrangler dev`, probe in Live mode, headless Chrome), judged the same way, one live run per drawing. Before the live runs, the saved gate replies for both drawings replayed on the new build with no errors and no calls.
+
+| File | Spark listed | Decorations and ground | Rainbow | Listed | Clean | Time | Cost |
+|---|---|---|---|---|---|---|---|
+| 1.jpeg | fish ×2, turtle, crab, starfish, seaweed, coral (7) | None listed (bubbles, sand and water skipped, as at the gate) | None drawn | 7 of 11 (64%) | 6 (55%) | 10.0 s (Spark 5.6 s) | $0.025 |
+| 2.jpeg | rainbow, sun, cloud ×6, house, tree, bush ×2 (12) | The 3 sparkle stars are no longer listed (gate: `star` ×3); no ground drawn or listed | Listed; 1 mask covering the whole arc | 12 of 12 (100%) | 12 (100%) | 9.3 s (Spark 5.3 s) | $0.025 |
+
+- **1.jpeg**: the small shell at bottom-left is no longer listed. It is a real object, so the drawing lost one listed object; one run can't tell whether the skip-decorations rule or run-to-run variance dropped it. Its gate masks were wrong anyway (the 3 rocks and the turtle's shell), so those 4 wrong-label cut-outs are gone too. The rocks are still not listed, and "seaweed" still returns 0 masks. Counted the same way, the gate run listed 8 objects (Spark's counts add up to 8; the gate table above says 9).
+- **2.jpeg**: both gate failures are fixed. The rainbow is listed (type `rainbow`, sky true) and SAM cut it cleanly. The sparkle stars are gone.
+- **Type changes between runs**: seaweed and coral are now `flower` (gate: `other-standing`), the bushes `other-standing` (gate: `tree`), and the fish and turtle have sky false (gate: true).
+- **Not re-checked live**: the ground-as-`field` entries and the grass dots ("flower ×10") came from ms1–ms3, which weren't re-run. Neither 1.jpeg nor 2.jpeg had ground listed at the gate, so the ground part of the fix is untested live.
+
+Spend: 2 understand calls (both on attempt 1 in the `wrangler dev` log, so no hidden retries) and 12 SAM calls, $0.05 at the design.md fixed estimates. Live gate spend including this re-check: **$0.23**.

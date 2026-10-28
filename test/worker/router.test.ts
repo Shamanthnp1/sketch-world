@@ -36,5 +36,5 @@ it("returns 405 with Allow for a known path and the wrong method", async () => {
 it("applies D1 migrations before tests and uses the fake model key", async () => {
   const row = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'd1_migrations'").first();
   expect(row).toEqual({ name: "d1_migrations" });
-  expect(env.MODEL_API_KEY).toBe("test-only-model-api-key");
+  expect(env.MODEL_API_KEY === "test-only-model-api-key").toBe(true);    // a boolean, so a failure never prints the key
 });

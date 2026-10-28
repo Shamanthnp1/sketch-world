@@ -7,10 +7,12 @@ const ok = (patch: object) => SparkScene.safeParse({ ...scene, ...patch }).succe
 const okObj = (patch: object) => ok({ objects: [{ ...obj, ...patch }] });
 
 describe("TYPES, ALL_TYPES and group", () => {
-  it("lists the 22 design.md types once each and maps them to their group", () => {
-    expect(ALL_TYPES).toHaveLength(22);
-    expect(new Set(ALL_TYPES).size).toBe(22);
+  it("lists the 23 design.md types once each and maps them to their group", () => {
+    expect(ALL_TYPES).toHaveLength(23);
+    expect(new Set(ALL_TYPES).size).toBe(23);
     for (const [g, types] of Object.entries(TYPES)) for (const t of types) expect(group(t)).toBe(g);
+    expect(TYPES.sky).toEqual(["sun", "moon", "cloud", "bird", "star", "rainbow"]);
+    expect(group("rainbow")).toBe("sky");
   });
 });
 
@@ -40,6 +42,9 @@ describe("SparkScene", () => {
     expect(ok({ objects: [] })).toBe(true);
     expect(ok({ objects: Array(12).fill(obj) })).toBe(true);
     expect(ok({ objects: Array(13).fill(obj) })).toBe(false);
+  });
+  it("accepts a rainbow (gate fix, Requirement 3.11)", () => {
+    expect(okObj({ type: "rainbow", noun: "rainbow", count: 1, sky: true })).toBe(true);
   });
   it("rejects an unknown type", () => {
     expect(okObj({ type: "dragon" })).toBe(false);
@@ -107,6 +112,7 @@ describe("SPARK_SCENE_JSON_SCHEMA", () => {
     const p = o.items!.properties! as Record<string, Record<string, unknown>>;
     expect(o.maxItems).toBe(12);
     expect(p.type.enum).toEqual(ALL_TYPES);
+    expect(p.type.enum).toContain("rainbow");
     expect(p.noun).toMatchObject({ minLength: 1, maxLength: 40 });
     expect(p.count).toMatchObject({ type: "integer", minimum: 1, maximum: 10 });
     expect(root.properties!.title).toMatchObject({ minLength: 1, maxLength: 60 });

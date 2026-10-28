@@ -84,6 +84,12 @@ it("sends one Spark call built by the Worker, replies with the scene and stores 
   expect(logged().includes(KEY)).toBe(false);
 });
 
+it("tells Spark to skip decorations and the ground, sky or background, and to list rainbows (Requirement 3.11)", () => {
+  for (const rule of ["Skip decorations: sparkles", "dots", "texture strokes", "Skip the ground, sky or background itself", 'type "rainbow"']) {
+    expect(SCENE_INSTRUCTIONS).toContain(rule);
+  }
+});
+
 it.each([
   ["an unknown type", unknownType],
   ["non-JSON text", "Here is the scene: {"],

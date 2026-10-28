@@ -6,7 +6,7 @@ export const TYPES = {
   building: ["house", "tower", "castle"],
   flat: ["water", "path", "road", "field"],
   terrain: ["mountain", "hill"],
-  sky: ["sun", "moon", "cloud", "bird", "star"],
+  sky: ["sun", "moon", "cloud", "bird", "star", "rainbow"],
 } as const;
 export type Group = keyof typeof TYPES;
 export type ObjType = (typeof TYPES)[Group][number];

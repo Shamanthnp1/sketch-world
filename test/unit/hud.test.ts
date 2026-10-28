@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NUDGE, nudgeDelta } from "../../src/ui/hud";
+import { movesDiffer, NUDGE, nudgeDelta, shareUrl } from "../../src/ui/hud";
 import { WORLD_BOUNDS } from "../../src/world/collide";
 import { placeDrag } from "../../src/world/drag";
 import type { Vec3 } from "../../src/world/space";
@@ -35,5 +35,29 @@ describe("nudgeDelta", () => {
     const from = { x: 0, y: 40 * Math.sin(0.5), z: -40 * Math.cos(0.5) }, d = nudgeDelta("sky", "up", 0);
     const p = placeDrag({ to: { x: from.x + d.x, y: from.y + d.y, z: from.z + d.z }, from, r: 0 }, "sky", WORLD_BOUNDS, [], { x: 0, z: 9 });
     expect(el(p)).toBeGreaterThan(el(from));
+  });
+});
+
+describe("movesDiffer (Save positions is enabled only when this is true)", () => {
+  const a = { "0": { x: 1.25, y: 0, z: -3 }, "4": { x: -2, y: 1.5, z: 0.5 } };
+  it("is false for the same moves, also after a JSON round trip and in another key order", () => {
+    expect(movesDiffer(a, a)).toBe(false);
+    expect(movesDiffer(JSON.parse(JSON.stringify(a)), a)).toBe(false);
+    expect(movesDiffer({ "4": a["4"], "0": a["0"] }, a)).toBe(false);
+    expect(movesDiffer({}, {})).toBe(false);
+  });
+  it("is true when an entry is added or dropped, or any coordinate changed", () => {
+    expect(movesDiffer({}, a)).toBe(true);                                       // Reset positions after a save
+    expect(movesDiffer({ "0": a["0"] }, a)).toBe(true);
+    expect(movesDiffer({ ...a, "7": { x: 0, y: 0, z: 0 } }, a)).toBe(true);
+    expect(movesDiffer({ ...a, "0": { x: 1.25, y: 0, z: -3.25 } }, a)).toBe(true);
+    expect(movesDiffer({ "0": a["0"], "5": a["4"] }, a)).toBe(true);           // same count, another id
+  });
+});
+
+describe("shareUrl", () => {
+  it("is the origin plus /w/<id>", () => {
+    expect(shareUrl("https://sketch-world.example.workers.dev", "Ab3dE5gH9k")).toBe("https://sketch-world.example.workers.dev/w/Ab3dE5gH9k");
+    expect(shareUrl("http://localhost:8791", "Ab3dE5gH9k")).toBe("http://localhost:8791/w/Ab3dE5gH9k");
   });
 });

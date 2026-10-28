@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, backdrop, point, understand } from "../../src/api";
+import { ApiError, backdrop, deleteWorld, getGallery, getWorld, OFFLINE, point, saveMoves, understand } from "../../src/api";
 
 const img = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" });
 const scene = { title: "Village", view: "side", isDrawing: true, safe: true, objects: [] };
@@ -64,5 +64,51 @@ describe("backdrop", () => {
   it.each([422, 502])("rejects %i with an ApiError", async (status) => {
     reply(Response.json({ error: `msg ${status}` }, { status }));
     await expect(backdrop("Village")).rejects.toMatchObject({ name: "ApiError", status, message: `msg ${status}` });
+  });
+});
+
+describe("saved worlds", () => {
+  const id = "Ab3dE5gH9k", token = "t".repeat(43);
+
+  it("getWorld GETs /api/worlds/:id and returns the reply; 404 is an ApiError", async () => {
+    const world = { id, title: "Village", createdAt: 1, scene: {}, assets: { source: "s", thumb: "t", cuts: {} } };
+    reply(Response.json(world));
+    expect(await getWorld(id)).toEqual(world);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`/api/worlds/${id}`);
+    reply(Response.json({ error: "World not found" }, { status: 404 }));
+    await expect(getWorld(id)).rejects.toMatchObject({ name: "ApiError", status: 404, message: "World not found" });
+  });
+
+  it("getGallery GETs /api/gallery", async () => {
+    const g = { worlds: [{ id, title: "Village", thumb: "/a/w/x/thumb.jpg", createdAt: 2 }], samples: [] };
+    reply(Response.json(g));
+    expect(await getGallery()).toEqual(g);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/gallery");
+  });
+
+  it("saveMoves PATCHes JSON {moves} with the Owner_Token as a Bearer token; 403 rejects with the Worker's message", async () => {
+    const moves = { "0": { x: 1, y: 0, z: -2 } };
+    reply(new Response(null, { status: 204 }));
+    await expect(saveMoves(id, token, moves)).resolves.toBeUndefined();
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe(`/api/worlds/${id}`);
+    expect(init).toMatchObject({ method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
+    expect(JSON.parse(init!.body as string)).toEqual({ moves });
+    reply(Response.json({ error: "Only the device that saved this world can change it" }, { status: 403 }));
+    await expect(saveMoves(id, token, moves)).rejects.toMatchObject({ status: 403, message: "Only the device that saved this world can change it" });
+  });
+
+  it("deleteWorld DELETEs with the Bearer token; 204 resolves, 403 rejects", async () => {
+    reply(new Response(null, { status: 204 }));
+    await expect(deleteWorld(id, token)).resolves.toBeUndefined();
+    expect(vi.mocked(fetch).mock.calls[0]).toEqual([`/api/worlds/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }]);
+    reply(Response.json({ error: "Only the device that saved this world can delete it" }, { status: 403 }));
+    await expect(deleteWorld(id, token)).rejects.toMatchObject({ name: "ApiError", status: 403 });
+  });
+
+  it("turns a request that never got a reply into ApiError 0 with a plain message", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await expect(getGallery()).rejects.toMatchObject({ name: "ApiError", status: 0, message: OFFLINE });
+    await expect(deleteWorld(id, token)).rejects.toMatchObject({ status: 0, message: OFFLINE });
   });
 });

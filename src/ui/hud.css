@@ -1,0 +1,94 @@
+/* The HUD over the World_View (src/ui/hud.ts; DESIGN.md "HUD"). Self-contained, so the ?probe overlay (tool.css
+   instead of app.css) shows the same HUD: DESIGN.md tokens, with fallbacks for the ones tool.css doesn't define. */
+.hud-layer {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+  pointer-events: none;   /* drags on the canvas pass between the HUD's pieces */
+  color: var(--ink, #172331);
+  font: 400 1rem/1.4 var(--font, system-ui, sans-serif);
+}
+.hud-layer > * { pointer-events: auto; }
+/* Keep the Objects panel above walk's touch buttons (two 56 px rows plus padding). */
+@media (any-pointer: coarse) { .hud-layer { padding-bottom: max(152px, calc(136px + env(safe-area-inset-bottom))); } }
+
+/* The strip: one white paper sheet; its controls are flat pills on it. */
+.hud {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px; max-width: 100%; padding: 4px;
+  border: 1px solid transparent; /* keeps an edge in forced colours */
+  border-radius: 28px;
+  background: var(--sheet, #fff);
+  box-shadow: var(--shadow-lift, 0 2px 2px rgb(52 40 22 / 0.1), 0 12px 24px -8px rgb(52 40 22 / 0.34));
+}
+.hud-title {
+  margin: 0; padding: 0 12px 0 16px;
+  font: 400 1.125rem/1.2 var(--font-display, "Young Serif", Georgia, serif);
+  overflow-wrap: anywhere; text-wrap: balance;
+}
+
+.hud-layer button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-width: 44px; min-height: 44px; margin: 0; padding: 0 16px;
+  border: 1px solid transparent; border-radius: 999px;
+  background: none; color: inherit; box-shadow: none; transform: none;
+  font: 600 0.9375rem/1.2 var(--font, system-ui, sans-serif);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms;
+}
+.hud-layer button:hover { background: var(--paper, #e7e2d8); }
+.hud-layer button[aria-pressed="true"] { background: var(--ink, #172331); color: var(--sheet, #fff); }
+.hud-layer button.primary { background: var(--accent, #ffc533); }
+.hud-layer button:disabled { background: none; color: var(--muted, #58524a); cursor: not-allowed; }
+.hud-layer :focus-visible { outline: 3px solid var(--ink, #172331); outline-offset: 3px; }
+
+/* Objects panel: a paper sheet under the strip; scrolls when the list is long. */
+.hud-panel {
+  width: min(320px, 100%); min-height: 0; overflow: auto; overscroll-behavior: contain;
+  padding: 12px 16px 16px;
+  border: 1px solid transparent; border-radius: var(--r, 3px);
+  background: var(--sheet, #fff);
+  box-shadow: var(--shadow-lift, 0 2px 2px rgb(52 40 22 / 0.1), 0 12px 24px -8px rgb(52 40 22 / 0.34));
+}
+.hud-panel h2 { margin: 0; font: 400 1.125rem/1.2 var(--font-display, "Young Serif", Georgia, serif); }
+.hud-hint { margin: 4px 0 8px; max-width: 65ch; color: var(--muted, #58524a); font-size: 0.875rem; line-height: 1.45; }
+.hud-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hud-list button { width: 100%; justify-content: flex-start; border-radius: var(--r, 3px); font-weight: 500; text-align: start; overflow-wrap: anywhere; }
+.hud-nudge {
+  display: grid; grid-template-columns: repeat(3, 48px); grid-template-areas: ". up ." "left down right";
+  gap: 4px; justify-content: center; margin-top: 12px;
+}
+.hud-nudge .hud-up { grid-area: up; }
+.hud-nudge .hud-left { grid-area: left; }
+.hud-nudge .hud-down { grid-area: down; }
+.hud-nudge .hud-right { grid-area: right; }
+.hud-heights { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.hud-nudge button, .hud-heights button, .hud-help button {
+  border-radius: var(--r, 3px);
+  box-shadow: var(--shadow, 0 1px 1px rgb(52 40 22 / 0.12), 0 4px 10px -3px rgb(52 40 22 / 0.24));
+}
+.hud-nudge button { padding: 0; font-size: 1.25rem; }
+.hud-nudge button:active, .hud-heights button:active { box-shadow: var(--shadow-press, 0 1px 1px rgb(52 40 22 / 0.18)); }
+.hud-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Controls help: a modal paper card on its second sheet. */
+.hud-help {
+  width: min(28rem, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto;
+  padding: 24px;
+  border: 1px solid transparent; border-radius: var(--r, 3px);
+  background: var(--sheet, #fff); color: var(--ink, #172331);
+  box-shadow: var(--edge, 5px 6px 0 0 #d6ccbb, 6px 9px 14px -6px rgb(52 40 22 / 0.3));
+}
+.hud-help::backdrop { background: rgb(23 35 49 / 0.4); } /* ink at 40%; ::backdrop doesn't see page tokens everywhere */
+.hud-help h2 { margin: 0 0 12px; font: 400 1.375rem/1.2 var(--font-display, "Young Serif", Georgia, serif); text-wrap: balance; }
+.hud-help ul { margin: 0 0 24px; padding-left: 1.25em; display: grid; gap: 8px; line-height: 1.5; }
+.hud-help button { min-height: 48px; padding: 0 24px; }
+
+@media (max-width: 599px) {
+  .hud { width: 100%; border-radius: 22px; }
+  .hud-title { flex-basis: 100%; padding-block: 8px 4px; }
+  .hud-panel { width: 100%; }
+}
+@media (forced-colors: active) {
+  .hud-layer button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+}
+@media (prefers-reduced-motion: reduce) { .hud-layer button { transition: none; } }

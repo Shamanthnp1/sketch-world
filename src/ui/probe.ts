@@ -13,6 +13,7 @@ import { placeMask } from "../sam/masks";
 import { parseSamOutput, type MaskRaster } from "../sam/parse";
 import { openWorld } from "../world/open";
 import { attachWalk } from "../world/walk";
+import { mountHud } from "./hud";
 import "./probe.css";
 
 type Mode = "live" | "replay" | "skip";
@@ -219,8 +220,9 @@ function paint(view: HTMLCanvasElement, work: OffscreenCanvas, outlines: readonl
 type Replay = { scene: SparkScene; fixture: ProbeFixture; work: ImageData };
 
 /**
- * "Open world" (replay only, task 6.7): the saved noun replies through the real chain (point and box calls reply
- * empty), then the World_View with walking in a full-window overlay. Resolves with a note for the status line.
+ * "Open world" (replay only, tasks 6.7, 6.12): the saved noun replies through the real chain (point and box calls
+ * reply empty), then the World_View with walking, dragging and the HUD in a full-window overlay. Resolves with a note
+ * for the status line.
  */
 async function openReplayWorld(page: HTMLElement, r: Replay, onClose: () => void): Promise<string> {
   const segs = r.fixture.segments;
@@ -234,6 +236,7 @@ async function openReplayWorld(page: HTMLElement, r: Replay, onClose: () => void
   host.setAttribute("aria-modal", "true");
   host.setAttribute("aria-label", "Replayed world");
   Object.assign(host.style, { position: "fixed", inset: "0", zIndex: "10", background: "var(--bg)" }); // CSSOM, allowed by the CSP
+  host.style.setProperty("--accent", "#ffc533"); // the World page's sun yellow for the HUD, not tool.css's blue
   document.body.append(host);
   page.inert = true;
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -243,12 +246,12 @@ async function openReplayWorld(page: HTMLElement, r: Replay, onClose: () => void
     throw e;
   });
   const walk = attachWalk(world, host), close = el("button", "", "Close");
-  Object.assign(close.style, { position: "absolute", top: "12px", right: "12px" });
-  host.append(close);
-  const done = () => { walk.dispose(); world.dispose(); host.remove(); page.inert = false; onClose(); };
+  host.focus(); // before the HUD, whose help dialog may take focus on a first visit
+  const hud = mountHud(host, world, { title: r.scene.title });
+  hud.bar.append(close);
+  const done = () => { hud.dispose(); walk.dispose(); world.dispose(); host.remove(); page.inert = false; onClose(); };
   close.addEventListener("click", done);
   host.addEventListener("keydown", (e) => { if (e.key === "Escape") done(); });
-  host.focus();
   const missing = notFound.map((i) => r.scene.objects[i].noun);
   return `World: ${world.cards.length === 1 ? "1 Card" : `${world.cards.length} Cards`}.`
     + (missing.length ? ` Not found without saved point replies: ${missing.join(", ")}.` : "");

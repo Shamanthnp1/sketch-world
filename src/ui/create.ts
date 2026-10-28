@@ -4,7 +4,7 @@
 // shell.ts loads this module with import(), so Home's entry chunk stays small; three.js stays behind openWorld.
 // The raw photo never leaves the browser: only the Work_Image JPEG is sent. User strings via textContent only.
 import type { SparkScene } from "../../shared/scene";
-import { ApiError, understand } from "../api";
+import { ApiError, backdrop, understand } from "../api";
 import { buildInstances, type WorkPixels } from "../cut/chain";
 import { chainIO } from "../cut/io";
 import { thresholdMask } from "../cut/threshold";
@@ -13,6 +13,7 @@ import { pixels, workImage } from "../image/encode";
 import { createPad, type Pad } from "../pad/pad";
 import { autoLevel, flatten } from "../paper/flatten";
 import type { World } from "../world/build";
+import { groundColour } from "../world/ground";
 import { openWorld } from "../world/open";
 import { attachWalk, type Walk } from "../world/walk";
 import { pickCorners } from "./corners";
@@ -107,6 +108,8 @@ export interface CreatedWorld {
   instances: Instance[];
   notFound: string[];      // nouns of the scene objects with no cut-out
   saveable: boolean;       // false for the Minimal_Scene
+  ground: string;          // groundColour(work, instances): the ground, and the gradient sky's horizon (Requirements 9.6, 9.7)
+  backdrop: Blob | null;   // Muse Image's sky once it shows; null while it paints, after a failure and for the Minimal_Scene
   world: World;
 }
 
@@ -230,27 +233,35 @@ export function mountCreate(main: HTMLElement): () => void {
       const px = pixels(canvas); // the JPEG's own size, so SAM masks line up
       if (!scene) {
         stage(2);
-        const m = minimalWorld(px);
-        return await open(me, { scene: MINIMAL_SCENE, work: m.work, jpeg, instances: m.instances, notFound: [], saveable: false });
+        const m = minimalWorld(px); // no title from Spark, so no backdrop is asked for: the gradient sky
+        return await open(me, { scene: MINIMAL_SCENE, work: m.work, jpeg, instances: m.instances, notFound: [], saveable: false }, null);
       }
       const n = objectCount(scene);
       stage(1, n);
-      // 8.2 plugs in here: start POST /api/backdrop with scene.title now, so it runs in parallel with the chain,
-      // then pass `ground` (groundColour(px, instances)) and the sky to openWorld in open().
+      // Muse Image paints the sky while the chain runs (Requirement 9.1). Any failure (422 refused, 502, 429, 503, no
+      // network) keeps the gradient (9.6), so it is dropped without a word.
+      const sky: { png?: Blob | null } = {};
+      const painted = backdrop(scene.title).catch(() => null).then((png) => (sky.png = png));
       const { instances, notFound } = await buildInstances(scene, px, chainIO(jpeg));
       if (me !== run) return;
       stage(2, n);
-      await open(me, { scene, work: px, jpeg, instances, notFound: missingNouns(scene, notFound), saveable: true });
+      await open(me, { scene, work: px, jpeg, instances, notFound: missingNouns(scene, notFound), saveable: true }, sky.png === undefined ? painted : sky.png);
     } catch (e) {
       if (me === run) fail(errorText(e), canResend(e) ? sent : null);
     }
   }
 
-  async function open(me: number, c: Omit<CreatedWorld, "world">): Promise<void> {
+  /** `sky`: the backdrop PNG if it is here (null: none), or the request still painting it. */
+  async function open(me: number, c: Omit<CreatedWorld, "world" | "ground" | "backdrop">, sky: Blob | null | Promise<Blob | null>): Promise<void> {
     const host = el("div", "create-world");
     host.setAttribute("role", "region");
     host.setAttribute("aria-label", "Your world");
-    const world = await openWorld(host, { instances: c.instances, work: c.work, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
+    const ground = groundColour(c.work, c.instances);
+    // A backdrop that is already here is decoded first, so the world opens with it instead of swapping it in a frame later.
+    const now = sky instanceof Blob ? await createImageBitmap(sky).catch(() => undefined) : undefined;
+    const world = await openWorld(host, {
+      instances: c.instances, work: c.work, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches, ground, sky: now,
+    });
     let walk: Walk | undefined, hud: Hud | undefined;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault(); // a reload or closed tab would lose the world
     closeWorld = () => {
@@ -270,7 +281,13 @@ export function mountCreate(main: HTMLElement): () => void {
     show("world");
     walk = attachWalk(world, host);
     host.focus(); // before the HUD, whose help dialog may take focus on a first visit
-    created = { ...c, world };
+    created = { ...c, ground, backdrop: now ? (sky as Blob) : null, world };
+    // A later backdrop swaps in when it arrives, unless this world was left or replaced (Make another) meanwhile.
+    if (sky instanceof Promise) {
+      void sky.then(async (png) => {
+        if (png && created?.world === world && (await world.setSky(png)) && created?.world === world) created.backdrop = png;
+      });
+    }
     hud = mountHud(host, world, { title: c.scene.title }); // 9.5: onSave: created.saveable ? () => save(created) : undefined
     // Make another closes this world for good, so it asks first, in a dialog styled like the HUD's help.
     const another = el("button", "", "Make another"), ask = el("dialog", "hud-help create-ask");

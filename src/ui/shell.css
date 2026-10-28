@@ -1,0 +1,4 @@
+/* Placeholder-only rules for src/ui/shell.ts; they go when the World page (6.12, 9.5) replaces the stage. */
+.stage { display: grid; align-content: space-between; gap: var(--s6); min-height: min(70svh, 560px); padding: var(--s4);
+  border-radius: var(--r); background: var(--kraft); }
+.stage-note { justify-self: center; padding-bottom: var(--s6); color: var(--muted); }

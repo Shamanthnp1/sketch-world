@@ -1,93 +1,171 @@
-/* Tokens and shared components from DESIGN.md. Screen-specific rules live next to their screen. */
+/* Site look from DESIGN.md: the paper pop-up theme. Tokens first, then the shell, then shared components.
+   Screen-specific rules live next to their screen. The ?probe dev tool swaps this sheet for tool.css (src/main.ts). */
+@font-face {
+  font-family: "Young Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/young-serif-latin-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-  --bg: #ffffff;
-  --surface: #f6f5f4;
-  --line: #e5e3df;
-  --rule: #efede9;
-  --line-strong: #c8c4be;
-  --ink: #1a1a1a;
-  --ink-2: #37352f;
-  --muted: #5d5b54;
-  --accent: #0b6bcb;
-  --ok-ink: #1d6b34;   --ok-bg: #d9f3e1;
-  --warn-ink: #793400; --warn-bg: #ffe8d4;
-  --err-ink: #b42318;  --err-bg: #fdecea;
-  --overlay: #ffd60a;
-  --overlay-halo: rgb(0 0 0 / 0.7);
-  --r-chip: 4px; --r-control: 6px; --r-card: 8px;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
-  --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* paper */
+  --paper: #e7e2d8;    /* page ground under the grain */
+  --sheet: #ffffff;    /* paper elements (cards, buttons, HUD, the footer's front hill) and text on ink */
+  --kraft: #d6ccbb;    /* the sheet behind a card, disabled fills, the middle hill */
+  --kraft-2: #c3b59d;  /* the back hill and shaded folds: shapes only, never under text */
+  /* ink: every text colour ≥ 4.5:1 on --paper, --sheet and --kraft */
+  --ink: #172331;
+  --muted: #58524a;
+  /* the one accent: sun yellow. A fill under ink text (10:1) and the sun; never text, never a border */
+  --accent: #ffc533;
+  --err-ink: #a3201a; --err-bg: #fbe7e4;
+  /* shadows: paper elements only */
+  --shadow: 0 1px 1px rgb(52 40 22 / 0.12), 0 4px 10px -3px rgb(52 40 22 / 0.24);
+  --shadow-lift: 0 2px 2px rgb(52 40 22 / 0.1), 0 12px 24px -8px rgb(52 40 22 / 0.34);
+  --shadow-press: 0 1px 1px rgb(52 40 22 / 0.18);
+  --edge: 5px 6px 0 0 var(--kraft), 6px 9px 14px -6px rgb(52 40 22 / 0.3); /* a second sheet under a card */
+  /* grain: sparse speckle grids with odd, unequal tile sides, so the layers never line up into a visible lattice */
+  --grain:
+    radial-gradient(circle, rgb(70 52 28 / 0.06) 0.6px, transparent 1px) 0 0 / 7px 9px,
+    radial-gradient(circle, rgb(70 52 28 / 0.05) 0.6px, transparent 1px) 3px 5px / 11px 13px,
+    radial-gradient(circle, rgb(255 255 255 / 0.35) 0.7px, transparent 1.1px) 6px 2px / 13px 7px,
+    radial-gradient(circle, rgb(70 52 28 / 0.045) 0.9px, transparent 1.3px) 9px 8px / 19px 17px;
+  /* type: one display face, the system stack for everything else */
+  --font-display: "Young Serif", Georgia, serif;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fs-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem); /* the Home headline only */
+  --fs-title: clamp(1.75rem, 1.5rem + 0.8vw, 2rem);    /* h1 on every other page */
+  --fs-heading: 1.375rem;                               /* h2 */
+  --fs-body: 1.0625rem;
+  --fs-small: 0.875rem;
+  /* shape and rhythm */
+  --r: 3px; --r-pill: 999px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  --page: 1120px; --margin: 16px;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
   color-scheme: light;
 }
+@media (min-width: 720px) { :root { --margin: 32px; } }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.5 var(--font); }
+body { margin: 0; min-height: 100svh; display: flex; flex-direction: column;
+  background: var(--grain), var(--paper); color: var(--ink); font: 400 var(--fs-body)/1.55 var(--font); }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
-h1 { font-size: 24px; font-weight: 600; line-height: 1.3; }
-h2 { font-size: 18px; font-weight: 600; line-height: 1.4; }
-h3 { font-size: 16px; font-weight: 600; line-height: 1.4; }
-p { margin: 0; max-width: 70ch; }
-a { color: var(--accent); }
+h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.015em; }
+h1 { font-size: var(--fs-title); line-height: 1.1; }
+h2 { font-size: var(--fs-heading); line-height: 1.2; }
+h3 { font-size: var(--fs-body); font-weight: 650; line-height: 1.35; }
+.display { font-size: var(--fs-display); line-height: 1; letter-spacing: -0.025em; }
+p { margin: 0; max-width: 65ch; }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+a:hover { text-decoration-thickness: 2px; }
 [hidden] { display: none !important; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-[tabindex="-1"]:focus-visible { outline: none; } /* focus targets (main, section headings), not controls */
+::selection { background: var(--accent); color: var(--ink); }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+[tabindex="-1"]:focus { outline: none; } /* focus targets (main), not controls */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-.skip { position: absolute; left: var(--s4); top: -100px; padding: var(--s2) var(--s3); background: var(--bg); }
+.skip { position: absolute; left: var(--margin); top: -100px; z-index: 30; padding: var(--s3) var(--s4);
+  background: var(--sheet); border-radius: var(--r); box-shadow: var(--shadow); font-weight: 600; }
 .skip:focus { top: var(--s2); }
 
-/* Product bar */
-/* Inline padding puts the brand on main's content edge (960px column, same side padding). */
-.bar { height: 56px; display: flex; align-items: center; padding-inline: max(var(--s4), calc(50% - 480px + var(--s4)));
-  border-bottom: 1px solid var(--line); }
-.brand { display: inline-flex; align-items: center; gap: var(--s2); color: var(--ink); font-weight: 600; text-decoration: none; }
+/* Shell: header on the ground, one centred column, the footer as the pop-up's base page */
+.bar, main, .foot-inner { width: 100%; max-width: calc(var(--page) + 2 * var(--margin)); margin-inline: auto; padding-inline: var(--margin); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--s4); padding-block: var(--s3); }
+.brand { display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px; text-decoration: none;
+  font: 400 1.375rem/1 var(--font-display); letter-spacing: -0.01em; white-space: nowrap; }
+.mark { flex: none; width: 34px; height: 34px; filter: drop-shadow(0 1px 1px rgb(52 40 22 / 0.3)); }
+.sun { fill: var(--accent); }
+.face { fill: var(--sheet); }
+.fold { fill: var(--kraft-2); }
+.nav { display: flex; margin-inline: calc(-1 * var(--s3)); } /* link text on the column edges, also when it wraps under the brand */
+.nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s3); font-weight: 600; font-size: 0.9375rem;
+  text-decoration: none; }
+.nav a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 7px; }
+.nav a[aria-current="page"] { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 7px; }
 
-main { max-width: 960px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); display: grid; gap: var(--s6); }
+main { flex: 1; display: grid; gap: var(--s7); align-content: start; padding-block: var(--s6) var(--s8); }
 main > * { min-width: 0; }
-main > :empty { display: none; } /* e.g. the calibration slot between runs: no extra grid gap */
-.lede, .hint, .meta { color: var(--muted); }
-.hint, .meta { font-size: 14px; line-height: 1.45; }
-.stack { display: grid; gap: var(--s3); }
 
-/* Buttons: every button is secondary unless .primary */
-button, input::file-selector-button {
-  min-height: 44px; padding: 0 18px; border: 1px solid var(--line-strong); border-radius: var(--r-control);
-  background: var(--bg); color: var(--ink); font: 500 14px/1.3 var(--font); cursor: pointer;
-  touch-action: manipulation; transition: background-color 120ms, opacity 120ms;
+.foot { margin-top: auto; }
+.hills { display: block; width: 100%; height: clamp(110px, 14vw, 190px); }
+.hills .back { fill: var(--kraft-2); }
+.hills .mid { fill: var(--kraft); }
+.hills .front { fill: var(--sheet); }
+.hills .fold { fill: var(--kraft); } /* a tree's shaded half, against the darker back hill */
+.foot-body { background: var(--sheet); }
+.foot-inner { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2) var(--s6); padding-block: var(--s2) var(--s6); }
+.foot-name { font: 400 var(--fs-heading)/1.2 var(--font-display); }
+.foot-inner p:not(.foot-name) { flex: 1 1 32ch; color: var(--muted); font-size: var(--fs-small); }
+.foot-inner a { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--fs-small); font-weight: 600; }
+
+/* Layout helpers */
+.stack { display: grid; gap: var(--s3); justify-items: start; }
+.lede { font-size: 1.1875rem; line-height: 1.5; }
+.meta { color: var(--muted); font-size: var(--fs-small); line-height: 1.45; }
+.grid { display: grid; gap: var(--s6) var(--s5); grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+
+/* Buttons are paper tabs: a sheet with a soft shadow that lifts on hover and presses flat. Links use .btn. */
+button, .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 48px; padding: 0 var(--s5);
+  border: 1px solid transparent; /* invisible, but drawn in forced-colors mode where fills and shadows vanish */
+  border-radius: var(--r); background: var(--sheet); color: var(--ink); box-shadow: var(--shadow);
+  font: 600 1rem/1.2 var(--font); text-align: center; text-decoration: none; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; /* :active presses the tab instead */
+  transition: transform 120ms var(--ease), box-shadow 120ms var(--ease), background-color 120ms;
 }
-button:hover, input:hover::file-selector-button { background: var(--surface); }
-button.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-button.primary:hover { opacity: 0.85; background: var(--ink); }
-button:disabled { background: var(--surface); color: var(--muted); border-color: var(--line); cursor: not-allowed; opacity: 1; }
-.actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+button:hover, .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+button:active, .btn:active { transform: translateY(1px); box-shadow: var(--shadow-press); }
+.primary { background: var(--accent); }
+button:disabled { background: var(--kraft); color: var(--muted); box-shadow: none; transform: none; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--s3); }
 
-/* File picker */
-label { font-weight: 500; }
-input[type="file"] { max-width: 100%; font: 400 14px/1.45 var(--font); color: var(--muted); }
-input[type="file"]::file-selector-button { margin-right: var(--s3); }
+/* Card: a paper sheet on a second sheet */
+.card { padding: var(--s5); border: 1px solid transparent; border-radius: var(--r); background: var(--sheet); box-shadow: var(--edge); }
+.card > * + * { margin-top: var(--s3); }
+.card > .actions { margin-top: var(--s5); }
 
-/* Progress */
-progress { appearance: none; display: block; width: 100%; height: 8px; border: 0; border-radius: 999px; background: var(--surface); overflow: hidden; }
-progress::-webkit-progress-bar { background: var(--surface); }
-progress::-webkit-progress-value { background: var(--accent); }
-progress::-moz-progress-bar { background: var(--accent); }
-.status { font-size: 14px; font-variant-numeric: tabular-nums; }
-
-/* Card, notice, error, tag */
-.card { border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s4); background: var(--bg); }
-.notice, .error { border-radius: var(--r-card); padding: var(--s3) var(--s4); font-size: 14px; }
-.notice { background: var(--surface); color: var(--ink-2); }
-.error { background: var(--err-bg); color: var(--err-ink); }
-.tag { display: inline-block; padding: 2px 8px; border-radius: var(--r-chip); font: 500 12px/1.4 var(--font); }
-.tag.ok { background: var(--ok-bg); color: var(--ok-ink); }
-.tag.warn { background: var(--warn-bg); color: var(--warn-ink); }
-
-@media (min-width: 720px) {
-  .bar { padding-inline: max(var(--s6), calc(50% - 480px + var(--s6))); }
-  main { padding: var(--s6); }
-  .card { padding: 20px; }
+/* HUD: one paper strip over the world; its controls are flat on the strip */
+.hud { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); width: fit-content; max-width: 100%; padding: var(--s1);
+  border: 1px solid transparent; border-radius: 28px; background: var(--sheet); box-shadow: var(--shadow-lift); }
+.hud-title { padding: 0 var(--s3) 0 var(--s4); font: 400 1.125rem/1.2 var(--font-display); overflow-wrap: anywhere; }
+.hud button { min-height: 44px; padding: 0 var(--s4); border-radius: var(--r-pill); background: none; box-shadow: none; font-size: 0.9375rem; }
+.hud button:hover { background: var(--paper); transform: none; box-shadow: none; }
+.hud button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+.hud button.primary { background: var(--accent); }
+.hud button:disabled { background: none; }
+@media (max-width: 599px) {
+  .hud { width: 100%; border-radius: 22px; }
+  .hud-title { flex-basis: 100%; padding-block: var(--s2) var(--s1); }
 }
+
+/* Progress steps: an <ol>; the current step's card folds up like a pop-up, done steps stand in ink */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.steps li { display: flex; align-items: center; gap: var(--s3); min-height: 44px; color: var(--muted); }
+.steps li::before { content: ""; flex: none; width: 26px; height: 30px; border-radius: var(--r); background: var(--kraft);
+  transform: perspective(80px) rotateX(62deg); transform-origin: 50% 100%; }
+.steps .done { color: var(--ink); }
+.steps .done::before { content: "✓" / ""; display: grid; place-items: center; background: var(--ink); color: var(--sheet);
+  font-weight: 700; transform: none; }
+.steps [aria-current="step"] { color: var(--ink); font-weight: 650; }
+.steps [aria-current="step"]::before { background: var(--accent); box-shadow: var(--shadow); transform: none;
+  animation: pop-up 1.2s var(--ease) infinite alternate; }
+@keyframes pop-up { from { transform: perspective(80px) rotateX(62deg); } to { transform: none; } }
+
+/* Toast: an ink slip in the .toasts live region, bottom centre */
+.toasts { position: fixed; z-index: 20; left: 50%; bottom: var(--s5); translate: -50% 0; width: max-content;
+  max-width: calc(100% - 2 * var(--margin)); display: grid; gap: var(--s2); justify-items: center; }
+.toast { padding: var(--s3) var(--s5); border: 1px solid transparent; border-radius: var(--r); background: var(--ink); color: var(--sheet); box-shadow: var(--shadow-lift);
+  font-weight: 500; animation: toast-in 200ms var(--ease); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
+
+.error { padding: var(--s3) var(--s4); border-radius: var(--r); background: var(--err-bg); color: var(--err-ink); font-size: var(--fs-small); }
+
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  button:hover, .btn:hover, button:active, .btn:active { transform: none; }
 }

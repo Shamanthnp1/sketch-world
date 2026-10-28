@@ -3,17 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Turn a drawing into a small 3D world you can walk through." />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="Turn a drawing into a small paper pop-up world you can walk through." />
+    <meta name="theme-color" content="#e7e2d8" />
     <link rel="icon" href="data:," />
+    <link rel="preload" href="/fonts/young-serif-latin-400.woff2" as="font" type="font/woff2" crossorigin />
     <title>Sketch World</title>
   </head>
   <body>
+    <!-- Elements marked data-site are the site chrome; the ?probe dev tool removes them (src/main.ts). -->
     <a class="skip" href="#app">Skip to content</a>
     <header class="bar">
-      <a class="brand" href="/" translate="no">Sketch World</a>
+      <a class="brand" href="/" translate="no"><svg class="mark" data-site viewBox="0 0 34 34" aria-hidden="true" focusable="false"><circle class="sun" cx="24" cy="10" r="6"/><path class="face" d="M3 30 15 9l6 21z"/><path class="fold" d="M15 9l16 21H21z"/></svg>Sketch World</a>
+      <nav class="nav" data-site aria-label="Main">
+        <a href="/create">Make a world</a>
+        <a href="/gallery">Gallery</a>
+      </nav>
     </header>
     <main id="app" tabindex="-1"></main>
+    <footer class="foot" data-site>
+      <svg class="hills" viewBox="0 0 1440 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+        <filter id="paper-shadow" x="-5%" y="-40%" width="110%" height="180%">
+          <feDropShadow dx="0" dy="-2" stdDeviation="3" flood-color="#342816" flood-opacity="0.22"/>
+        </filter>
+        <circle class="sun" cx="860" cy="70" r="30"/>
+        <path class="back" filter="url(#paper-shadow)" d="M-40 118C150 66 300 62 450 92s310 26 450-14 300-40 580 6V200H-40z"/>
+        <g filter="url(#paper-shadow)">
+          <path class="face" d="M290 130l40-80 8 80z"/><path class="fold" d="M330 50l40 80h-32z"/>
+          <path class="face" d="M584 142l36-74 7 74z"/><path class="fold" d="M620 68l36 74h-29z"/>
+          <path class="face" d="M1150 122l32-64 6 64z"/><path class="fold" d="M1182 58l32 64h-26z"/>
+        </g>
+        <path class="mid" filter="url(#paper-shadow)" d="M-40 146c240-42 420-46 600-18s320 22 500-16 260-12 420 14V200H-40z"/>
+        <path class="front" filter="url(#paper-shadow)" d="M-40 174c280-24 500-28 740-8s400 16 600-6 140-4 180-2V200H-40z"/>
+      </svg>
+      <div class="foot-body">
+        <div class="foot-inner">
+          <p class="foot-name" translate="no">Sketch World</p>
+          <p>Built with Meta Muse Spark, SAM 3.1 and Muse Image for the Meta Global AI Developer Hackathon 2026.</p>
+          <!-- shortcut: placeholder link until the public sketch-world repo exists; point it at the repo then -->
+          <a href="https://github.com/">Source on GitHub</a>
+        </div>
+      </div>
+    </footer>
+    <div class="toasts" data-site role="status" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

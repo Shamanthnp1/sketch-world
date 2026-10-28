@@ -1,13 +1,17 @@
-// Browser entry: the gate probe when the URL has ?probe (loaded only then), else a placeholder until task 7.5.
+// Browser entry: ?probe on any path mounts the gate probe (loaded only then) with its own look; every other URL
+// goes through the client-side router into the site shell.
 import "./ui/app.css";
+import { startRouter } from "./router";
+import { showPage } from "./ui/shell";
 
 const main = document.getElementById("app")!;
-if (new URLSearchParams(location.search).has("probe")) (await import("./ui/probe")).mountProbe(main);
-else {
-  main.innerHTML = `
-    <div class="stack">
-      <h1>Sketch World is coming soon</h1>
-      <p class="lede">Draw a scene and walk through it in 3D. Until then, the
-        <a href="?probe">gate probe</a> checks how a drawing is read and cut out.</p>
-    </div>`;
+if (new URLSearchParams(location.search).has("probe")) {
+  // The dev tool keeps its pre-redesign look (Requirement 17.13): no site chrome, and tool.css instead of app.css.
+  for (const el of document.querySelectorAll("[data-site]")) el.remove();
+  const siteSheets = [...document.styleSheets];
+  await import("./ui/tool.css");
+  for (const s of siteSheets) s.disabled = true;
+  (await import("./ui/probe")).mountProbe(main);
+} else {
+  startRouter((route, first) => showPage(main, route, first));
 }

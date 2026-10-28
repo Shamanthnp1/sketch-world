@@ -44,7 +44,7 @@ export function mountGallery(main: HTMLElement): () => void {
       if (left) return;
       main.innerHTML = `${HEAD}<div class="stack"><p class="error" role="alert"></p><button type="button" class="primary">Try again</button></div>`;
       main.querySelector(".error")!.textContent = e instanceof ApiError && e.status === 0 ? e.message : "The gallery couldn’t load. Try again.";
-      main.querySelector("button")!.addEventListener("click", () => void load());
+      main.querySelector("button")!.addEventListener("click", () => { void load(); main.focus(); }); // the button is gone: keep focus in main
       return;
     }
     if (left) return;

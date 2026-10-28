@@ -134,8 +134,19 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
   600px the strip spans the width and the title takes its own row.
   - Built by `mountHud(host, world, {title, onSave?})` in `src/ui/hud.ts` with its own `src/ui/hud.css` (tokens with
     fallbacks, so the `?probe` overlay shows the same HUD). Strip order: title (`h1`), Objects (`aria-expanded`),
-    Pause motion (`aria-pressed`, hidden with reduced motion), Reset positions, Help, Save & share. Until `onSave`
-    exists Save & share is `aria-disabled` with "Saving is coming soon" as its description, so it stays focusable.
+    Pause motion (`aria-pressed`, hidden with reduced motion), Reset positions, Help, Save & share. Without `onSave`
+    (the Minimal_Scene, the probe) Save & share is `aria-disabled` with "This world can’t be saved" as its
+    description, so it stays focusable. The page sets its label and busy state through `hud.save` ("Saving…", then
+    "Share link" once the world is saved, and always on the Viewer).
+  - **Share this world** (`hud.share(url, {open?, owner?})`): a modal card styled like Controls help, with one
+    sentence (anyone with the link can open it, and it's in the Gallery), the link in a read-only `--paper` field
+    (selected on focus), primary Copy link (Clipboard API; without it the link is selected and the status line says
+    to copy it), Open (Create only) and Close. Owners also get a hint line: this device can delete the world later.
+  - **Save positions** (`hud.offerSavePositions`, owners of a saved world only): a pill before Share link,
+    `aria-disabled` with "Nothing has moved since the last save" while the moves equal the saved ones; "Saving
+    positions…" while PATCH runs; success is a "Positions saved" toast.
+  - **Error slip** (`hud.showError`): an `--err-bg` paper slip with `--err-ink` text (`role="alert"`) and Dismiss
+    under the strip, for a failed save, Save positions or delete; the world stays open. Never a toast.
   - Reset positions turns into "Undo reset" until something moves again (no immediate destructive action).
   - **Objects panel**: a `--sheet` sheet under the strip (320px, full width under 600px) with an `h2`, one hint, a
     list of toggle rows (one per Card, by label; the selected row is ink and its Card is tinted accent with an ink
@@ -159,6 +170,7 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
   `a.world-card` prints, each a `--sheet` card on its `--edge` with a 4:3 thumbnail (`width`/`height` set, lazy) and
   the title in Young Serif 18px via `textContent`, linking to `/w/:id`; hover lifts it 2px. With no items it shows
   `.strip-empty`: four `--kraft` slots cut as cards lying flat, and one sentence saying worlds appear there.
+  `worldCards(items)` builds the `ul.strip`; the Gallery page uses the same cards.
 - **Focus**: `:focus-visible` draws a 3px `--ink` outline 3px out on every control and link. Never removed.
 - **Forced colours**: buttons, cards, the HUD and toasts carry a transparent 1px border so they keep an edge when the
   system replaces fills and shadows.
@@ -214,12 +226,39 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
   paper slip under the strip (`.create-note`, `--sheet` with `--shadow-lift`, Dismiss), never in a toast.
 - **Minimal_Scene** (after a 502): the trimmed drawing on a white page 3 × its longer side wide, so its one hill Card
   shows whole from the spawn point.
+- **Save & share**: "Saving…" on the button, then the Share this world dialog; the button becomes Share link (the
+  same link again, never a second world), Save positions joins the strip, and the reload warning goes (the world
+  opens again from its link). A refused save shows in the error slip and the world stays open. The address stays
+  `/create`: `history.replaceState` would leave the router's current path behind.
 - **Sky** (`src/world/build.ts`): Muse Image's panorama on a sphere around the player, twice around with its edges
   crossfaded (no seam, no mirror line), at the same scale up as across; its painted horizon fades into one haze colour,
   which the fog shares, so the ground runs into the sky without a line. Until it arrives, and when it can't be painted
   (no message: the gradient is a complete sky), a vertical gradient from the ground colour (`groundColour`, tinted
   towards white) at the horizon to a soft blue (`#a9c7df`) from about 50° up. The one colour gradient on the site:
   it's the World's sky, never a page surface. The Minimal_Scene always has the gradient.
+
+## Viewer (`src/ui/viewer.ts`, `src/ui/viewer.css`)
+
+The World page layout for a saved world at `/w/:id`, loaded with `import()`; three.js loads only when it opens.
+
+- **Opening**: a `.card` "Opening this world…" with one meta line (`role="status"`) while the scene and cut-outs load.
+- **World**: the host covers the window and the site header and footer hide, as on Create; the page title becomes
+  the world's. The strip: title, Objects, Pause motion, Reset positions, Help, Share link (the accent), then
+  "Make your own" (an `a.btn` pill to `/create`). Owners (an Owner_Token in `localStorage`) also get Save positions
+  before Share link and "Delete world" after it, which asks first in a dialog styled like Controls help ("Delete
+  world" / "Keep it", opening on Keep it); a deleted world goes to the Gallery with a "World deleted" toast.
+  Everyone else can move things, but nothing they move is saved, and they get no save or delete controls.
+- **Not found** (404): `h1` "This world isn’t here", one lede, primary "See the gallery" and "Make a world".
+- **Failed** (no network, a missing picture): a `.card` with the `.error` and a primary "Try again".
+
+## Gallery (`src/ui/gallery.ts`, `src/ui/gallery.css`)
+
+- `h1` "Gallery" and one lede, then the world cards (`worldCards`): "Sample worlds" (`h2`) first when there are any,
+  then "Newest worlds" (`h2`, without the samples); with no samples the newest follow the lede directly.
+- Loading: one meta line "Loading the gallery…". Empty: the "No shared worlds yet" `.card` with a primary "Make a
+  world". Failed: the `.error` and a primary "Try again".
+- Home's strip uses the same reply: the samples first, then the newest, 6 at most; "Walk a sample world" opens the
+  first sample when there is one, else the Gallery.
 
 ## Routes and the shell
 
@@ -229,7 +268,7 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
   `/a/*`, and modified clicks load normally. Back and forward work; the Worker's SPA fallback serves `index.html`.
 - `index.html` holds the shell (skip link, header, footer, the toast region) so it paints before any script runs.
 - `src/ui/shell.ts` fills `main` per route and sets the title ("Gallery · Sketch World") and the current nav link.
-  Home is `src/ui/home.ts`; the other pages are placeholders until Create (7.5), and Gallery and the Viewer (9.5) replace them. The footer stays hidden while `main` is empty, so it never paints and then jumps.
+  Home is `src/ui/home.ts` and the Gallery `src/ui/gallery.ts`; Create and the Viewer load with `import()`. The footer stays hidden while `main` is empty, so it never paints and then jumps.
 - Page templates are static markup. User strings (titles, labels, ids, server messages) go into the DOM only via
   `textContent`.
 

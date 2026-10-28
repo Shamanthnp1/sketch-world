@@ -242,7 +242,7 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
     h.id = "hud-share-h";
     d.setAttribute("aria-labelledby", h.id);
     link.id = "hud-share-link";
-    Object.assign(link, { type: "url", readOnly: true, value: url, spellcheck: false });
+    Object.assign(link, { type: "url", name: "link", autocomplete: "off", readOnly: true, value: url, spellcheck: false });
     link.addEventListener("focus", () => link.select());
     const label = Object.assign(el("label", "", "Link"), { htmlFor: link.id });
     said.setAttribute("role", "status");

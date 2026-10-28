@@ -116,7 +116,7 @@ export function mountViewer(main: HTMLElement, id: string): () => void {
       } else {
         main.innerHTML = FAILED;
         main.querySelector(".error")!.textContent = e instanceof ApiError && e.status === 0 ? e.message : "Something went wrong while opening this world. Try again.";
-        main.querySelector("button")!.addEventListener("click", () => void load());
+        main.querySelector("button")!.addEventListener("click", () => { void load(); main.focus(); }); // the button is gone: keep focus in main
       }
       main.querySelector<HTMLElement>("h1")!.focus();
       return;

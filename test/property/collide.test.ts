@@ -61,5 +61,5 @@ describe("Feature: sketch-world, Property 6: Collision keeps the player valid", 
           }
         }
       }), { numRuns: 1000 });
-  });
+  }, 30_000); // passes in about 2 s alone, but went past vitest's 5 s default in a full-suite run under load
 });

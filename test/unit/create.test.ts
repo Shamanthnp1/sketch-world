@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SparkScene } from "../../shared/scene";
 import { ApiError } from "../../src/api";
-import { errorText, MINIMAL_SCENE, minimalInstances, missingNouns, noteText, objectCount, stepNames } from "../../src/ui/create";
+import { canResend, errorText, MINIMAL_SCENE, minimalWorld, missingNouns, noteText, objectCount, stepNames } from "../../src/ui/create";
 import { layout } from "../../src/world/layout";
 import { Z_BACK } from "../../src/world/space";
 
@@ -43,6 +43,14 @@ describe("errorText", () => {
   });
 });
 
+describe("canResend", () => {
+  it("offers Try again unless the picture itself was refused", () => {
+    for (const s of [400, 413, 415, 422]) expect(canResend(new ApiError(s, "x"))).toBe(false);
+    for (const s of [429, 500, 503]) expect(canResend(new ApiError(s, "x"))).toBe(true);
+    expect(canResend(new TypeError("Failed to fetch"))).toBe(true);
+  });
+});
+
 describe("missingNouns", () => {
   it("maps notFound indices to their nouns in scene order, each once", () => {
     const scene = { objects: [obj("tree", 1), obj("sun", 1), obj("tree", 2), obj("cat", 1)] };
@@ -64,19 +72,30 @@ describe("Minimal_Scene", () => {
     expect(SparkScene.parse(MINIMAL_SCENE)).toEqual(MINIMAL_SCENE);
     expect(MINIMAL_SCENE.safe).toBe(false);
   });
-  it("is the whole drawing as one threshold Card, trimmed to its ink, enclosed white kept", () => {
-    // a 3 × 3 ink ring with a white middle at (2, 1) in a 7 × 5 page
-    const ring: [number, number][] = [[2, 1], [3, 1], [4, 1], [2, 2], [4, 2], [2, 3], [3, 3], [4, 3]];
-    const [o, ...rest] = minimalInstances(page(7, 5, ring));
+  it("is the whole drawing as one threshold Card, trimmed to its ink, enclosed white kept, centred on a wide page", () => {
+    // a 3 × 3 ink ring with a white middle at (5, 4) in a 12 × 10 page framed by a dark edge line (a corner tapped
+    // just outside the paper), which the 2 px margin drops
+    const ring: [number, number][] = [[4, 3], [5, 3], [6, 3], [4, 4], [6, 4], [4, 5], [5, 5], [6, 5]];
+    const frame: [number, number][] = [];
+    for (let x = 0; x < 12; x++) frame.push([x, 0], [x, 9]);
+    for (let y = 1; y < 9; y++) frame.push([0, y], [11, y]);
+    const { work, instances: [o, ...rest] } = minimalWorld(page(12, 10, [...frame, ...ring]));
     expect(rest).toEqual([]);
-    expect(o).toMatchObject({ id: 0, objIndex: 0, source: "threshold", type: "hill", bbox: { x: 2, y: 1, w: 3, h: 3 } });
+    expect(work).toMatchObject({ width: 9, height: 3 }); // MINIMAL_PAGE × the longer side, the drawing's height
+    expect(o).toMatchObject({ id: 0, objIndex: 0, source: "threshold", type: "hill", bbox: { x: 3, y: 0, w: 3, h: 3 } });
     expect([...o.mask]).toEqual(new Array(9).fill(1));
-    // a hill stands at the back, where the whole drawing fits the view
-    expect(layout([o], { w: 7, h: 5 })[0]).toMatchObject({ kind: "terrain", z: Z_BACK - 2 });
+    // the page holds the drawing's pixels at the bbox and white elsewhere
+    const ink = (x: number, y: number) => work.data[4 * (y * work.width + x)] === 20;
+    expect([ink(3, 0), ink(4, 1), ink(5, 2), ink(2, 0), ink(6, 2)]).toEqual([true, false, true, false, false]);
+    // a hill at the back whose longer side is 12 units, so the whole drawing is in view from the spawn point
+    const p = layout([o], { w: work.width, h: work.height })[0];
+    expect(p).toMatchObject({ kind: "terrain", x: 0, z: Z_BACK - 2 });
+    expect(Math.max(p.w, p.h)).toBeCloseTo(12);
   });
   it("keeps a blank page whole", () => {
-    const [o] = minimalInstances(page(4, 3, []));
-    expect(o.bbox).toEqual({ x: 0, y: 0, w: 4, h: 3 });
+    const { work, instances: [o] } = minimalWorld(page(4, 3, []));
+    expect(o.bbox).toEqual({ x: 4, y: 0, w: 4, h: 3 });
+    expect(work).toMatchObject({ width: 12, height: 3 });
     expect(o.mask.every((v) => v === 1)).toBe(true);
   });
 });

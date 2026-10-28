@@ -5,11 +5,14 @@
 import { z } from "zod";
 import { group, SparkScene, type ObjType } from "../../shared/scene";
 import { ApiError, understand } from "../api";
+import { buildInstances, type ChainIO } from "../cut/chain";
 import { pixels, workImage } from "../image/encode";
 import { SamClient, SegmentError } from "../sam/client";
 import { cutout } from "../sam/cutout";
 import { placeMask } from "../sam/masks";
 import { parseSamOutput, type MaskRaster } from "../sam/parse";
+import { openWorld } from "../world/open";
+import { attachWalk } from "../world/walk";
 import "./probe.css";
 
 type Mode = "live" | "replay" | "skip";
@@ -213,6 +216,44 @@ function paint(view: HTMLCanvasElement, work: OffscreenCanvas, outlines: readonl
   }
 }
 
+type Replay = { scene: SparkScene; fixture: ProbeFixture; work: ImageData };
+
+/**
+ * "Open world" (replay only, task 6.7): the saved noun replies through the real chain (point and box calls reply
+ * empty), then the World_View with walking in a full-window overlay. Resolves with a note for the status line.
+ */
+async function openReplayWorld(page: HTMLElement, r: Replay, onClose: () => void): Promise<string> {
+  const segs = r.fixture.segments;
+  const io: ChainIO = {
+    segment: async (p) => (p.noun !== undefined && Object.hasOwn(segs, p.noun) ? parseSamOutput(segs[p.noun]) : []),
+    point: async () => ({ boxes: [] }),
+  };
+  const { instances, notFound } = await buildInstances(r.scene, r.work, io);
+  const host = el("div");
+  host.setAttribute("role", "dialog");
+  host.setAttribute("aria-modal", "true");
+  host.setAttribute("aria-label", "Replayed world");
+  Object.assign(host.style, { position: "fixed", inset: "0", zIndex: "10", background: "var(--bg)" }); // CSSOM, allowed by the CSP
+  document.body.append(host);
+  page.inert = true;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const world = await openWorld(host, { instances, work: r.work, reducedMotion }).catch((e: unknown) => {
+    host.remove();
+    page.inert = false;
+    throw e;
+  });
+  const walk = attachWalk(world, host), close = el("button", "", "Close");
+  Object.assign(close.style, { position: "absolute", top: "12px", right: "12px" });
+  host.append(close);
+  const done = () => { walk.dispose(); world.dispose(); host.remove(); page.inert = false; onClose(); };
+  close.addEventListener("click", done);
+  host.addEventListener("keydown", (e) => { if (e.key === "Escape") done(); });
+  host.focus();
+  const missing = notFound.map((i) => r.scene.objects[i].noun);
+  return `World: ${world.cards.length === 1 ? "1 Card" : `${world.cards.length} Cards`}.`
+    + (missing.length ? ` Not found without saved point replies: ${missing.join(", ")}.` : "");
+}
+
 const TEMPLATE = `
   <div class="stack">
     <h1>Gate probe</h1>
@@ -249,6 +290,7 @@ const TEMPLATE = `
       <div><dt>Estimated cost</dt><dd><span class="pr-cost">—</span><span class="tag" hidden></span></dd></div>
     </dl>
     <p class="hint pr-sum-hint"></p>
+    <div class="actions pr-open-row" hidden><button type="button" class="pr-open">Open world</button></div>
     <figure class="pr-fig">
       <canvas role="img" aria-label="The drawing with the accepted masks outlined"></canvas>
       <figcaption class="meta"></figcaption>
@@ -289,6 +331,8 @@ export function mountProbe(main: HTMLElement): void {
   const sceneLine = $(".pr-scene"), objs = $(".pr-objs");
   const gate = $(".pr-gate"), drawnInput = $<HTMLInputElement>("#pr-drawn"), md = $(".pr-md"), msg = $(".pr-msg");
   const saveBtn = $<HTMLButtonElement>(".pr-save");
+  const openRow = $(".pr-open-row"), openBtn = $<HTMLButtonElement>(".pr-open");
+  let replay: Replay | null = null;
   const tagAfter = (sel: string) => $(sel).nextElementSibling as HTMLElement;
 
   const fixtures = new Map<string, ProbeFixture>();    // image name → saved replies
@@ -424,6 +468,8 @@ export function mountProbe(main: HTMLElement): void {
       + "Spark $0.01 per understand call, SAM $0.0025 per segment call (design.md estimates); a schema retry inside "
       + "the Worker adds $0.01 that this page can't see.";
     saveBtn.disabled = !!fixture;
+    replay = fixture ? { scene, fixture, work: img } : null;
+    openRow.hidden = !replay;
     msg.textContent = "";
     gate.hidden = false;
     updateGate();
@@ -450,7 +496,8 @@ export function mountProbe(main: HTMLElement): void {
     urls.forEach((u) => URL.revokeObjectURL(u));
     urls = [];
     rows = [];
-    last = null;
+    last = replay = null;
+    openRow.hidden = true;
     objs.replaceChildren();
     sceneLine.textContent = "";
     try {
@@ -464,6 +511,17 @@ export function mountProbe(main: HTMLElement): void {
   });
 
   drawnInput.addEventListener("input", updateGate);
+
+  openBtn.addEventListener("click", async () => {
+    if (!replay) return;
+    openBtn.disabled = true;
+    try {
+      status.textContent = await openReplayWorld(main, replay, () => { openBtn.disabled = false; openBtn.focus(); });
+    } catch {
+      openBtn.disabled = false;
+      status.textContent = "Couldn't open the world. This browser may have WebGL turned off.";
+    }
+  });
 
   $(".pr-copy").addEventListener("click", async () => {
     try {

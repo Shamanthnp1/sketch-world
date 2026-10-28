@@ -1,0 +1,38 @@
+/* Walk controls (src/world/walk.ts): drags on the canvas look, touch devices get hold-to-move and hold-to-turn
+   paper buttons. DESIGN.md tokens with fallbacks for the ?probe page. */
+.world { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.world > canvas { touch-action: none; }   /* one-finger drags look instead of scrolling */
+.world:focus-visible { outline: 3px solid var(--ink, #172331); outline-offset: -3px; } /* inside a full-window world */
+
+.walk-pad { display: none; }
+@media (any-pointer: coarse) {
+  .walk-pad {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    pointer-events: none;   /* the gap between the groups still looks */
+  }
+}
+.walk-move, .walk-turn { display: flex; gap: 8px; pointer-events: auto; }
+.walk-move { flex-direction: column; }
+.walk-pad button {
+  width: 56px; height: 56px; min-height: 0; padding: 0;
+  display: grid; place-items: center;
+  background: var(--sheet, #fff); color: var(--ink, #172331);
+  border: 1px solid transparent;   /* keeps an edge in forced colours */
+  border-radius: var(--r, 3px);
+  box-shadow: var(--shadow, 0 1px 1px rgb(52 40 22 / 0.12), 0 4px 10px -3px rgb(52 40 22 / 0.24));
+  font: 600 26px/1 var(--font, system-ui, sans-serif);
+  touch-action: none;
+  transform: none;
+  transition: transform 120ms, box-shadow 120ms;
+}
+.walk-pad button.held {
+  background: var(--paper, #e7e2d8);
+  box-shadow: var(--shadow-press, 0 1px 1px rgb(52 40 22 / 0.18));
+  transform: translateY(1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .walk-pad button { transition: none; }
+  .walk-pad button.held { transform: none; }
+}

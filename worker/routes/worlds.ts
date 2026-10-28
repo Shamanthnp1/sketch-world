@@ -6,8 +6,8 @@
 //   backdrop.jpg   JPEG ≤ 400 KB, sent exactly when scene.backdrop is "image"
 //   cut/<n>.png    PNG ≤ 200 KB, long side ≤ 512 px, one per Instance id n
 // Every field once and no others. Images are checked by header bytes only (the Worker never decodes them).
-import { SavedScene } from "../../shared/saved";
-import { randomId, randomToken, sha256Hex } from "../crypto";
+import { SavedScene, type WorldReply } from "../../shared/saved";
+import { randomId, randomToken, sha256Hex, WORLD_ID } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
 import { MAX_CUT_PNG_BYTES, MAX_IMAGE_BYTES, readJsonField } from "../limits/input";
@@ -90,6 +90,52 @@ async function readUpload(form: FormData, { key, cap, type }: Spec): Promise<Upl
   return { key, bytes, info };
 }
 
-// Stubs until task 9.2 (read, delete).
-export const getWorld = async (): Promise<Response> => jsonError(501, "Not implemented");
-export const deleteWorld = async (): Promise<Response> => jsonError(501, "Not implemented");
+/** The URL GET /a/:key serves the R2 object w/<id>/<file> at. */
+export const assetUrl = (id: string, file: string) => `/a/w/${id}/${file}`;
+
+// GET /api/worlds/:id (Requirement 10.6): the stored SavedScene plus its asset URLs. Never returns owner_token_hash.
+export async function getWorld(_req: Request, env: Env, _ctx: unknown, { id = "" }: { id?: string }): Promise<Response> {
+  if (!WORLD_ID.test(id)) return jsonError(404, "World not found");
+  const row = await env.DB.prepare("SELECT title, scene, created_at FROM worlds WHERE id = ?1 AND safe = 1")
+    .bind(id).first<{ title: string; scene: string; created_at: number }>();
+  if (!row) return jsonError(404, "World not found");
+  const scene = JSON.parse(row.scene) as SavedScene;    // checked by the SavedScene schema on save
+  const reply: WorldReply = {
+    id, title: row.title, createdAt: row.created_at, scene,
+    assets: {
+      source: assetUrl(id, "source.jpg"),
+      thumb: assetUrl(id, "thumb.jpg"),
+      ...(scene.backdrop === "image" && { backdrop: assetUrl(id, "backdrop.jpg") }),
+      cuts: Object.fromEntries(scene.instances.map((i) => [String(i.id), assetUrl(id, `cut/${i.id}.png`)])),
+    },
+  };
+  return Response.json(reply);
+}
+
+// DELETE /api/worlds/:id (Requirements 10.10, 10.11). A missing or wrong token and an unknown id get the same 403,
+// so the route never tells whether an id exists.
+export async function deleteWorld(req: Request, env: Env, _ctx: unknown, { id = "" }: { id?: string }): Promise<Response> {
+  if (!(await isOwner(req, env, id))) return jsonError(403, "Only the device that saved this world can delete it");
+  // D1 first: the row is what makes the world visible, so it leaves the viewer and gallery even if R2 cleanup fails.
+  await env.DB.prepare("DELETE FROM worlds WHERE id = ?1").bind(id).run();
+  try {
+    // A world has at most 33 objects (source, thumb, backdrop, 30 cuts), so one list page (up to 1000) holds them all.
+    const { objects } = await env.BUCKET.list({ prefix: `w/${id}/` });
+    if (objects.length) await env.BUCKET.delete(objects.map((o) => o.key));
+  } catch (err) {
+    console.error(JSON.stringify({ route: "worlds", cleanup: "failed", error: err instanceof Error ? err.name : "unknown" }));
+  }
+  return new Response(null, { status: 204 });
+}
+
+// True if the request carries `Authorization: Bearer <Owner_Token>` whose SHA-256 equals the world's stored hash,
+// compared in constant time. The token is hashed before the lookup, so a known and an unknown id cost the same.
+async function isOwner(req: Request, env: Env, id: string): Promise<boolean> {
+  const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.get("Authorization") ?? "")?.[1];
+  if (!token || !WORLD_ID.test(id)) return false;
+  const hash = new TextEncoder().encode(await sha256Hex(token));
+  const row = await env.DB.prepare("SELECT owner_token_hash FROM worlds WHERE id = ?1").bind(id).first<{ owner_token_hash: string }>();
+  if (!row) return false;
+  const stored = new TextEncoder().encode(row.owner_token_hash);
+  return stored.byteLength === hash.byteLength && crypto.subtle.timingSafeEqual(stored, hash);
+}

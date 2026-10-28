@@ -13,17 +13,6 @@ it.each([
   expect(await res.json()).toEqual({ error: "Not found" });
 });
 
-it.each([
-  ["GET", "/api/worlds/abc"],
-  ["DELETE", "/api/worlds/abc"],
-  ["GET", "/api/gallery"],
-  ["GET", "/a/w/abcdefghij/cut/1.png"],
-])("routes %s %s to its (stub) handler", async (method, path) => {
-  const res = await call(method, path);
-  expect(res.status).toBe(501);
-  expect(await res.json()).toEqual({ error: "Not implemented" });
-});
-
 it("returns 405 with Allow for a known path and the wrong method", async () => {
   const res = await call("PUT", "/api/worlds/abc");
   expect(res.status).toBe(405);

@@ -8,6 +8,9 @@ export async function sha256Hex(data: Uint8Array | string): Promise<string> {
   return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** What randomId() makes. Checked before any D1 or R2 access by id. */
+export const WORLD_ID = /^[A-Za-z0-9]{10}$/;
+
 /** A world id: 10 random base62 chars. Bytes ≥ 248 (= 4 × 62) are skipped, so every char is equally likely. */
 export function randomId(length = 10): string {
   let id = "";

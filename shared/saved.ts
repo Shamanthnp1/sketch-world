@@ -57,3 +57,17 @@ export const SavedScene = z.object({
   message: "moves must name movable instances and stay inside the bounds for their kind",
 });
 export type SavedScene = z.output<typeof SavedScene>;
+
+/** GET /api/worlds/:id. Asset URLs are under /a/w/<id>/; `cuts` maps each Instance id to its cut-out PNG. */
+export interface WorldReply {
+  id: string;
+  title: string;
+  createdAt: number; // ms since the epoch
+  scene: SavedScene;
+  assets: { source: string; thumb: string; backdrop?: string /* only when scene.backdrop is "image" */; cuts: Record<string, string> };
+}
+
+/** One world in GET /api/gallery; a superset of the Home strip's GalleryItem {id, title, thumb}. */
+export interface GalleryWorld { id: string; title: string; thumb: string; createdAt: number }
+/** `worlds`: the 24 latest safe worlds, newest first. `samples`: the SAMPLE_WORLD_IDS worlds that exist, in that order. */
+export interface GalleryReply { worlds: GalleryWorld[]; samples: GalleryWorld[] }

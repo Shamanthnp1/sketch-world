@@ -1,0 +1,30 @@
+/* Corner clicks (src/ui/corners.ts): the photo as a print on the desk, a numbered paper tag beside each tapped corner
+   and the outline drawn between them. Buttons, .meta and .error come from app.css. */
+.corners { display: grid; gap: var(--s3); justify-items: start; scroll-margin-top: var(--s3); }
+.corners-prompt { font-weight: 600; }
+@media (max-width: 599px) { .corners-prompt { min-height: 2lh; } } /* the prompt may wrap; keep the photo still */
+
+/* The photo's shape (--ar = width / height, set by corners.ts), fitting the column and, with the section scrolled
+   to the top, the screen height left by the heading, hint, prompt and one row of buttons. */
+.corners-stage { position: relative; width: min(100%, calc(max(240px, 100svh - 15rem) * var(--ar, 1))); aspect-ratio: var(--ar, 1);
+  overflow: hidden; border-radius: var(--r); background: var(--sheet); box-shadow: var(--shadow); }
+/* No border or padding: toPhotoPx maps the canvas's border box. manipulation keeps pinch-zoom and drops the tap delay. */
+.corners-stage canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.corners-stage svg, .corners-marks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* A white halo under an ink line, so the outline reads on light paper and on a dark desk alike */
+.corners-line { fill: none; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.corners-line.halo { stroke: var(--sheet); stroke-width: 5px; }
+.corners-line.ink { stroke: var(--ink); stroke-width: 2px; }
+
+/* A 0 × 0 box at the tapped point: a dot on the point, and its number on a paper tag towards the paper's middle */
+.corner-mark { position: absolute; width: 0; height: 0; }
+.corner-mark::before { content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ink); box-shadow: 0 0 0 2px var(--sheet); }
+.corner-mark span { position: absolute; display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--s1);
+  border: 1px solid transparent; border-radius: var(--r); background: var(--accent); color: var(--ink); box-shadow: var(--shadow);
+  font: 700 var(--fs-small)/1 var(--font); font-variant-numeric: tabular-nums; translate: 8px 8px; }
+.corner-mark[data-i="1"] span { translate: calc(-100% - 8px) 8px; }
+.corner-mark[data-i="2"] span { translate: calc(-100% - 8px) calc(-100% - 8px); }
+.corner-mark[data-i="3"] span { translate: 8px calc(-100% - 8px); }

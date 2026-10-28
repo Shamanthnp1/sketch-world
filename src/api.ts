@@ -35,6 +35,11 @@ export function point(image: Blob, objects: readonly PointObject[]): Promise<Poi
   return post("/api/point", body);
 }
 
+/** POST /api/worlds with the multipart save that src/share/save.ts builds. 201 → the new world's id and Owner_Token. */
+export function saveWorldRequest(form: FormData): Promise<{ id: string; ownerToken: string }> {
+  return post("/api/worlds", form);
+}
+
 async function post<T>(path: string, body: FormData): Promise<T> {
   const res = await fetch(path, { method: "POST", body });
   if (!res.ok) {

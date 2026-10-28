@@ -211,7 +211,17 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
 
 - **Choices**: `h1` "Make a world", one lede, then two `.card`s side by side from 720px (stacked below): "Photo of a
   drawing" (primary "Choose a photo", plus "Take a photo" with the camera on coarse pointers only) and "Draw here"
-  ("Start drawing"). Each card's buttons sit on one line at its foot. One privacy line under both.
+  ("Start drawing"). Each card's buttons sit on one line at its foot. Under both, one meta line (`.create-privacy`):
+  only the drawing goes to Meta's AI models and a photo of it stays on the device. The full notice is the Privacy
+  notice dialog below, shown before the first upload.
+- **Privacy notice** (`askPrivacy` in `src/ui/privacy.ts`, `src/ui/privacy.css`; Requirement 12.1): a modal `dialog`
+  card on its `--edge`, styled like Controls help, with an ink 40% backdrop. `h2` "Before your drawing is sent", a
+  list of three points (the drawing goes to Meta's AI models, and for a photo only the flattened drawing; a saved
+  world is public by link and listed in the Gallery; the saving device can delete it), then primary "Send my
+  drawing" and "Not now". It opens before the first upload: after a photo decodes and before the corner taps, or on
+  "Make my world" for the pad. Send my drawing stores `sketch-world:privacy-v1` in `localStorage` (kept for the page
+  load when storage is off; new wording gets a new key); Not now or Escape sends nothing and keeps the photo or the
+  drawing. Tab cycles between the two buttons. Text via `textContent`.
 - **Draw here**: the pad sized so its tools, the canvas and the actions fit one screen; primary "Make my world" and
   "Back". An empty pad gets an `.error` ("Draw something first") instead of a request.
 - **Corners**: `pickCorners` (`src/ui/corners.ts`); Cancel returns to the choices.
@@ -219,7 +229,15 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
   polite status says each step as it starts. The heading takes focus.
 - **Failed**: a `.card` with an `h2`, the `.error` (the Worker's own words for 422, a short reason otherwise),
   "Try another picture" (photo) or "Back to my drawing" (pad, the drawing kept), and, when the picture wasn't the
-  problem (429, 503, 5xx, no network), a primary "Try again" that sends the same drawing again.
+  problem (429, 503, 5xx, no network), a primary "Try again" that sends the same drawing again. A file that isn't a
+  picture, a photo that won't decode and one too large to flatten each get their own sentence.
+- **Sample_Mode** (`.create-sample`; Requirements 11.7, 11.8): when the daily cost cap is reached (503
+  `{mode: "sample"}` from understand, or a chain that ends with no cut-outs after one), a `.card` replaces the
+  failure: `h2` "No more new worlds today" (takes focus), one paragraph (today's budget is used up, come back
+  tomorrow, walk a sample world or see the Gallery meanwhile), then primary "Walk a sample world" (the first sample
+  from `GET /api/gallery`, else `/gallery`), "See the gallery" and "Back to my drawing" (pad, the drawing kept) or
+  "Try another picture" (photo). Same width as the progress and failed cards. A 503 without `mode` is a busy server
+  and stays the failed card's "try again in a minute".
 - **World**: the host covers the window and the site header and footer hide; the HUD strip gains "Make another",
   which asks first in a dialog styled like Controls help ("Make another" / "Keep this world"), and a reload or
   closed tab asks the browser's own question. Objects not found, and why a Minimal_Scene can't be saved, go on one

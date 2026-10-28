@@ -1,4 +1,5 @@
-/* Gate probe (src/ui/probe.ts). Tokens and shared components come from app.css (DESIGN.md). */
+/* Gate probe (src/ui/probe.ts), a dev tool with its own look. Tokens and shared components come from tool.css, the
+   pre-redesign tool look that src/main.ts loads instead of app.css; the DESIGN.md site tokens don't apply here. */
 .pr { overflow-wrap: break-word; }    /* long file names in notes and errors */
 .pr fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: var(--s1); }
 .pr legend { padding: 0; margin-bottom: var(--s1); font-weight: 600; }

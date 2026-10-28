@@ -1,0 +1,25 @@
+/* Create page (src/ui/create.ts; DESIGN.md "Create"): two paper-card choices, the pad, corner taps, staged progress,
+   and the world over the whole window. Buttons, .card, .steps, .error and .meta come from app.css. */
+.create-choices { display: grid; gap: var(--s6) var(--s5); }
+@media (min-width: 720px) { .create-choices { grid-template-columns: 1fr 1fr; } }
+.create-choice { display: flex; flex-direction: column; padding: var(--s6); }
+.create-choice h2 { font-size: 1.625rem; }
+.create-choice > .actions { margin-top: auto; padding-top: var(--s5); } /* both cards' buttons on one line */
+.create-privacy { grid-column: 1 / -1; }
+.create-take { display: none; } /* the camera shortcut only where a camera is likely: phones and tablets */
+@media (any-pointer: coarse) { .create-take { display: inline-flex; } }
+
+.create-pad { display: grid; gap: var(--s3); justify-items: start; scroll-margin-top: var(--s3); }
+.create-pad-host { width: 100%; }
+/* With the section scrolled to the top, the pad fits the screen with its tools above and Make my world below. */
+.create-pad .pad-canvas { width: min(100%, calc(max(240px, 100svh - 15rem) * 4 / 3)); }
+
+.create-progress, .create-fail { width: 100%; max-width: 36rem; }
+
+/* The world: the whole window (design.md "World"), while create.ts hides the site header and footer. */
+main > .create-world { position: fixed; inset: 0; z-index: 10; background: var(--paper); }
+
+/* "Not found" note under the HUD strip: a paper slip with a Dismiss button (hud.css styles the button). */
+.create-note { display: flex; align-items: center; gap: var(--s2); max-width: min(30rem, 100%); padding: var(--s1) var(--s1) var(--s1) var(--s4);
+  border: 1px solid transparent; border-radius: var(--r); background: var(--sheet); box-shadow: var(--shadow-lift); }
+.create-note p { font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere; }

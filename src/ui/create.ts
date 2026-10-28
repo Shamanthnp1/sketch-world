@@ -1,0 +1,319 @@
+// The Create page at /create (task 7.5; Requirements 1.6, 2.5, 3.7, 3.10, 5.9, 7.8, 17.7, 17.8): two choices,
+// "Photo of a drawing" (corners → flatten → autoLevel) and "Draw here" (the pad PNG as is), then the Work_Image →
+// POST /api/understand → the cut-out chain → the World_View with walking and the HUD, behind staged progress.
+// shell.ts loads this module with import(), so Home's entry chunk stays small; three.js stays behind openWorld.
+// The raw photo never leaves the browser: only the Work_Image JPEG is sent. User strings via textContent only.
+import type { SparkScene } from "../../shared/scene";
+import { ApiError, understand } from "../api";
+import { buildInstances, type WorkPixels } from "../cut/chain";
+import { chainIO } from "../cut/io";
+import { thresholdMask } from "../cut/threshold";
+import type { Instance } from "../cut/types";
+import { pixels, workImage } from "../image/encode";
+import { createPad, type Pad } from "../pad/pad";
+import { autoLevel, flatten } from "../paper/flatten";
+import type { World } from "../world/build";
+import { openWorld } from "../world/open";
+import { attachWalk, type Walk } from "../world/walk";
+import { pickCorners } from "./corners";
+import { mountHud, type Hud } from "./hud";
+import { toast } from "./shell";
+import "./create.css";
+
+/** Σcount: the cut-outs the scene asks for (≤ 30 after capInstances). */
+export const objectCount = (scene: Pick<SparkScene, "objects">) => scene.objects.reduce((n, o) => n + o.count, 0);
+
+/** The three progress step names; `n` (Σcount) is known once Spark has replied. */
+export function stepNames(n?: number): [string, string, string] {
+  const cut = n === undefined ? "Cutting out the objects" : `Cutting out ${n} ${n === 1 ? "object" : "objects"}`;
+  return ["Reading your drawing", cut, "Popping up your world"];
+}
+
+const GENERIC = "Something went wrong while making your world. Please try again.";
+
+/** What to tell the user about a failed run: the Worker's own words for 422 (Requirement 3.10), else a short reason. */
+export function errorText(e: unknown): string {
+  if (!(e instanceof ApiError)) return GENERIC;
+  switch (e.status) {
+    case 422: return e.message;
+    case 429: case 503: return "Lots of worlds are being made right now. Please try again in a minute."; // 10.5 adds Sample_Mode for 503
+    case 413: return "That picture is too large to send. Try a smaller one.";
+    case 415: return "That picture’s format can’t be read. Try a JPEG or PNG.";
+    case 400: return "That picture couldn’t be sent. Try another one.";
+    default: return GENERIC;
+  }
+}
+
+/** The nouns of the scene objects the chain found nothing for (Requirement 5.9), in scene order, each once. */
+export const missingNouns = (scene: Pick<SparkScene, "objects">, notFound: readonly number[]) =>
+  [...new Set(notFound.map((i) => scene.objects[i].noun))];
+
+/** Minimal_Scene (Requirement 3.7): shown after a 502 from understand. safe false: its safety is unknown, so no saving. */
+export const MINIMAL_SCENE: SparkScene = {
+  title: "Your drawing", view: "side", isDrawing: true, safe: false,
+  objects: [{ type: "hill", noun: "your drawing", count: 1, sky: false }],
+};
+
+/**
+ * The Minimal_Scene's one Card: the whole Work_Image as a threshold cut-out, its bbox trimmed to the opaque pixels
+ * (build stretches the trimmed cut-out to the bbox). A hill stands at the back at 1.5× size, so it fits the view.
+ */
+export function minimalInstances(work: WorkPixels): Instance[] {
+  const { width: w, height: h } = work, all = thresholdMask(work.data, w, h);
+  if (!all.includes(1)) all.fill(1); // a blank page: keep the whole page (as Requirement 5.7 does for a box)
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let i = 0; i < all.length; i++) {
+    if (!all[i]) continue;
+    const x = i % w, y = (i - x) / w;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = y;
+  }
+  const bbox = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, mask = new Uint8Array(bbox.w * bbox.h);
+  for (let y = 0; y < bbox.h; y++) mask.set(all.subarray((y0 + y) * w + x0, (y0 + y) * w + x0 + bbox.w), y * bbox.w);
+  const o = MINIMAL_SCENE.objects[0];
+  return [{ id: 0, objIndex: 0, type: o.type, noun: o.noun, sky: o.sky, bbox, mask, source: "threshold" }];
+}
+
+/** Everything a made world keeps, for Save & share (9.4, 9.5). Lives in mountCreate's `created` while the world is open. */
+export interface CreatedWorld {
+  scene: SparkScene;       // Spark's reply, or MINIMAL_SCENE after a 502
+  work: ImageData;         // the Work_Image pixels the masks refer to; work.width × work.height is the layout size
+  jpeg: Blob;              // the exact bytes sent to /api/understand (source.jpg: the Checks_Row holds its SHA-256)
+  instances: Instance[];
+  notFound: string[];      // nouns of the scene objects with no cut-out
+  saveable: boolean;       // false for the Minimal_Scene
+  world: World;
+}
+
+type Work = { canvas: OffscreenCanvas; jpeg: Blob };
+type View = "choices" | "pad" | "corners" | "progress" | "fail" | "world";
+
+const TEMPLATE = `
+  <div class="stack create-intro">
+    <h1>Make a world</h1>
+    <p class="lede" data-for="choices">Start from a drawing on paper, or draw one here.</p>
+  </div>
+  <div class="create-choices" data-view="choices">
+    <section class="card create-choice" aria-labelledby="cc-photo">
+      <h2 id="cc-photo">Photo of a drawing</h2>
+      <p>Take a photo of your drawing, then mark its four corners so the paper lies flat.</p>
+      <div class="actions">
+        <button type="button" class="primary" data-a="choose">Choose a photo</button>
+        <button type="button" class="create-take" data-a="take">Take a photo</button>
+      </div>
+      <input type="file" accept="image/*" data-in="choose" hidden>
+      <input type="file" accept="image/*" capture="environment" data-in="take" hidden>
+    </section>
+    <section class="card create-choice" aria-labelledby="cc-draw">
+      <h2 id="cc-draw">Draw here</h2>
+      <p>Draw in black on white with a mouse, a pen or your finger.</p>
+      <div class="actions"><button type="button" data-a="draw">Start drawing</button></div>
+    </section>
+    <p class="meta create-privacy">Your photo stays on this device; only the flattened drawing is sent.</p>
+  </div>
+  <section class="create-pad" data-view="pad" aria-labelledby="cd-h" hidden>
+    <h2 id="cd-h" tabindex="-1">Draw here</h2>
+    <p class="meta">Draw a few things, like a house, a tree and the sun. Each one becomes a paper cut-out.</p>
+    <div class="create-pad-host"></div>
+    <p class="error" role="alert" hidden></p>
+    <div class="actions">
+      <button type="button" class="primary" data-a="make">Make my world</button>
+      <button type="button" data-a="back">Back</button>
+    </div>
+  </section>
+  <div class="create-corners" data-view="corners" hidden></div>
+  <section class="card create-progress" data-view="progress" aria-labelledby="cg-h" hidden>
+    <h2 id="cg-h" tabindex="-1">Making your world</h2>
+    <ol class="steps"><li></li><li></li><li></li></ol>
+    <p class="meta">This takes up to a minute.</p>
+  </section>
+  <section class="card create-fail" data-view="fail" aria-labelledby="cf-h" hidden>
+    <h2 id="cf-h" tabindex="-1">Your world couldn’t be made</h2>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="primary" data-a="retry"></button></div>
+  </section>
+  <p class="vh" role="status" data-live></p>`;
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ""): HTMLElementTagNameMap[K] {
+  return Object.assign(document.createElement(tag), { className: cls, textContent: text });
+}
+
+/** Fills `main` with the Create page. Returns the clean-up for leaving the page (shell.ts calls it on navigation). */
+export function mountCreate(main: HTMLElement): () => void {
+  main.innerHTML = TEMPLATE;
+  const $ = <T extends HTMLElement>(sel: string) => main.querySelector<T>(sel)!;
+  const btn = (a: string) => $<HTMLButtonElement>(`[data-a="${a}"]`);
+  const views = main.querySelectorAll<HTMLElement>("[data-view]"), lede = $(".lede"), live = $("[data-live]");
+  const padHost = $(".create-pad-host"), padErr = $<HTMLParagraphElement>(".create-pad .error");
+  const steps = [...main.querySelectorAll<HTMLLIElement>(".steps li")], failText = $(".create-fail .error"), retry = btn("retry");
+  const chrome = document.querySelectorAll<HTMLElement>(".skip, .bar, .foot"); // the site header and footer, hidden under a world
+
+  let pad: Pad | null = null;
+  let from: "photo" | "pad" = "photo";
+  let run = 0;                                // bumped by every new run and on leaving: a stale run drops its result
+  let created: CreatedWorld | null = null;    // the open world's data; 9.5's onSave reads it
+  let closeWorld: (() => void) | null = null;
+
+  function show(view: View, focus?: HTMLElement): void {
+    for (const v of views) v.hidden = v.dataset.view !== view;
+    lede.hidden = view !== "choices";
+    $(".create-intro").hidden = view === "world";
+    (focus ?? main.querySelector<HTMLElement>(`[data-view="${view}"] h2[tabindex]`))?.focus({ preventScroll: true });
+  }
+
+  function stage(i: number, n?: number): void {
+    const names = stepNames(n);
+    steps.forEach((li, k) => {
+      li.textContent = names[k];
+      li.classList.toggle("done", k < i);
+      if (k < i) li.append(el("span", "vh", " (done)"));
+      if (k === i) li.setAttribute("aria-current", "step");
+      else li.removeAttribute("aria-current");
+    });
+    live.textContent = `${names[i]}…`;
+  }
+
+  function fail(text: string): void {
+    closeWorld?.();
+    retry.textContent = from === "pad" ? "Back to my drawing" : "Try another picture";
+    show("fail");
+    failText.textContent = text; // after unhiding, so the alert is announced
+    live.textContent = "";
+  }
+
+  /** Work_Image → understand → chain → world. `me` is this run's number. */
+  async function make(me: number, work: () => Promise<Work>): Promise<void> {
+    stage(0);
+    show("progress");
+    try {
+      const { canvas, jpeg } = await work();
+      const scene = await understand(jpeg).catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 502) return null; // Spark failed twice: Minimal_Scene (Requirement 3.7)
+        throw e;
+      });
+      if (me !== run) return;
+      const px = pixels(canvas); // the JPEG's own size, so SAM masks line up
+      let instances: Instance[], notFound: number[] = [], n: number | undefined;
+      if (scene) {
+        n = objectCount(scene);
+        stage(1, n);
+        // 8.2 plugs in here: start POST /api/backdrop with scene.title now, so it runs in parallel with the chain,
+        // then pass `ground` (groundColour(px, instances)) and the sky to openWorld in open().
+        ({ instances, notFound } = await buildInstances(scene, px, chainIO(jpeg)));
+        if (me !== run) return;
+      } else instances = minimalInstances(px);
+      stage(2, n);
+      const s = scene ?? MINIMAL_SCENE;
+      await open(me, { scene: s, work: px, jpeg, instances, notFound: missingNouns(s, notFound), saveable: !!scene });
+    } catch (e) {
+      if (me === run) fail(errorText(e));
+    }
+  }
+
+  async function open(me: number, c: Omit<CreatedWorld, "world">): Promise<void> {
+    const host = el("div", "create-world");
+    host.setAttribute("role", "region");
+    host.setAttribute("aria-label", "Your world");
+    const world = await openWorld(host, { instances: c.instances, work: c.work, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
+    let walk: Walk | undefined, hud: Hud | undefined;
+    closeWorld = () => {
+      hud?.dispose();
+      walk?.dispose();
+      world.dispose();
+      world.renderer.forceContextLoss(); // frees the WebGL context now instead of at garbage collection
+      host.remove();
+      for (const e of chrome) e.hidden = false;
+      created = closeWorld = null;
+    };
+    if (me !== run) return closeWorld(); // left the page while three.js loaded
+    main.append(host);
+    for (const e of chrome) e.hidden = true;
+    show("world");
+    walk = attachWalk(world, host);
+    host.focus(); // before the HUD, whose help dialog may take focus on a first visit
+    created = { ...c, world };
+    hud = mountHud(host, world, { title: c.scene.title }); // 9.5: onSave: created.saveable ? () => save(created) : undefined
+    const another = el("button", "", "Make another");
+    another.type = "button";
+    another.addEventListener("click", () => {
+      closeWorld?.();
+      pad?.clear(); // Undo on the pad still brings the drawing back
+      show("choices", btn("choose"));
+      scrollTo(0, 0);
+    });
+    hud.bar.append(another);
+    if (c.notFound.length) {
+      const note = el("div", "create-note"), ok = el("button", "", "Dismiss");
+      ok.type = "button";
+      ok.addEventListener("click", () => { note.remove(); host.focus(); });
+      note.append(el("p", "", `Not found in your drawing: ${c.notFound.join(", ")}.`), ok);
+      hud.bar.after(note);
+    }
+    if (!c.saveable) toast("The drawing reader is busy, so your whole drawing is one card. This world can’t be saved.");
+    live.textContent = `Your world “${c.scene.title}” is open.${c.notFound.length ? ` Not found: ${c.notFound.join(", ")}.` : ""}`;
+  }
+
+  // Photo of a drawing: decode (EXIF orientation applied) → corners (Cancel returns here) → flatten → autoLevel.
+  async function fromPhoto(input: HTMLInputElement): Promise<void> {
+    const file = input.files?.[0];
+    input.value = ""; // picking the same file again fires change again
+    if (!file) return;
+    from = "photo";
+    const me = ++run;
+    let photo: ImageBitmap;
+    try {
+      photo = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch {
+      return fail("That file couldn’t be opened as a picture. Try a JPEG or PNG photo.");
+    }
+    if (me !== run) return photo.close();
+    show("corners");
+    const q = await pickCorners($(".create-corners"), photo).catch(() => null);
+    if (me !== run) return photo.close();
+    if (!q) {
+      photo.close();
+      return show("choices", btn("choose"));
+    }
+    await make(me, () => {
+      const full = new OffscreenCanvas(photo.width, photo.height), ctx = full.getContext("2d")!;
+      ctx.drawImage(photo, 0, 0);
+      photo.close();
+      const flat = autoLevel(flatten(ctx.getImageData(0, 0, full.width, full.height), q));
+      return workImage(new ImageData(flat.data, flat.width, flat.height));
+    });
+  }
+
+  // Draw here: the pad's PNG is the Work_Image as is (Requirement 2.5).
+  async function fromPad(): Promise<void> {
+    if (!pad || pad.isEmpty()) {
+      padErr.hidden = false;
+      padErr.textContent = "Draw something first, then choose Make my world.";
+      return;
+    }
+    from = "pad";
+    const p = pad;
+    await make(++run, async () => {
+      const bmp = await createImageBitmap(await p.exportPng());
+      try { return await workImage(bmp); } finally { bmp.close(); }
+    });
+  }
+
+  for (const k of ["choose", "take"]) {
+    const input = $<HTMLInputElement>(`[data-in="${k}"]`);
+    btn(k).addEventListener("click", () => input.click());
+    input.addEventListener("change", () => void fromPhoto(input));
+  }
+  btn("draw").addEventListener("click", () => {
+    pad ??= createPad(padHost);
+    show("pad");
+    $(".create-pad").scrollIntoView({ block: "start" }); // the pad is sized to fit the screen from here
+  });
+  padHost.addEventListener("pointerdown", () => { padErr.hidden = true; });
+  btn("make").addEventListener("click", () => void fromPad());
+  btn("back").addEventListener("click", () => show("choices", btn("draw")));
+  retry.addEventListener("click", () => (from === "pad" ? show("pad") : show("choices", btn("choose"))));
+
+  return () => {
+    run++;
+    closeWorld?.();
+  };
+}

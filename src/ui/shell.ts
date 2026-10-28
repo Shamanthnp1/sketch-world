@@ -1,38 +1,14 @@
-// Site pages inside the static shell of index.html (header, footer, toasts). Home is src/ui/home.ts; the others are
-// placeholders until their task builds them: Create 7.5, Gallery and the /w/:id Viewer 9.5. Templates are static markup; user
-// strings (the world id) go into the DOM only via textContent (Requirement 17.18).
+// Site pages inside the static shell of index.html (header, footer, toasts). Home is src/ui/home.ts; Create is
+// src/ui/create.ts, loaded with import() so Home's entry chunk stays small; Gallery and the /w/:id Viewer are
+// placeholders until 9.5. Templates are static markup; user strings (the world id) go into the DOM only via
+// textContent (Requirement 17.18).
 import { match, type Route } from "../router";
 import { mountHome } from "./home";
 import "./shell.css";
 
 const PAGES: Record<Route["page"], { title: string; html: string }> = {
   home: { title: "", html: "" }, // src/ui/home.ts renders it
-  create: { title: "Make a world", html: `
-    <div class="stack">
-      <h1>Make a world</h1>
-      <p class="lede">Start from a drawing on paper, or draw one here.</p>
-      <p class="meta" id="create-soon">Both ways open in the next build.</p>
-    </div>
-    <div class="grid">
-      <section class="card" aria-labelledby="create-photo">
-        <h2 id="create-photo">Photo of a drawing</h2>
-        <p>Take a photo of your drawing, then mark its four corners so the paper lies flat.</p>
-        <div class="actions"><button type="button" class="primary" disabled aria-describedby="create-soon">Choose a photo</button></div>
-      </section>
-      <section class="card" aria-labelledby="create-draw">
-        <h2 id="create-draw">Draw here</h2>
-        <p>Draw in black on white with a mouse, a pen or your finger.</p>
-        <div class="actions"><button type="button" disabled aria-describedby="create-soon">Start drawing</button></div>
-      </section>
-      <section class="card" aria-labelledby="create-steps">
-        <h2 id="create-steps">While your world is made</h2>
-        <ol class="steps">
-          <li class="done">Reading your drawing<span class="vh"> (done)</span></li>
-          <li aria-current="step">Cutting out the objects</li>
-          <li>Popping up your world</li>
-        </ol>
-      </section>
-    </div>` },
+  create: { title: "Make a world", html: "" }, // src/ui/create.ts renders it
   gallery: { title: "Gallery", html: `
     <div class="stack">
       <h1>Gallery</h1>
@@ -64,11 +40,21 @@ const PAGES: Record<Route["page"], { title: string; html: string }> = {
     </div>` },
 };
 
+let leave: (() => void) | undefined; // the shown page's clean-up (Create disposes its world)
+let visit = 0;
+
 export function showPage(main: HTMLElement, route: Route, first: boolean): void {
-  const page = PAGES[route.page];
+  leave?.();
+  leave = undefined;
+  const page = PAGES[route.page], me = ++visit;
   document.title = page.title ? `${page.title} · Sketch World` : "Sketch World";
   main.innerHTML = page.html;
   if (route.page === "home") mountHome(main);
+  if (route.page === "create") {
+    import("./create").then((m) => { if (me === visit) leave = m.mountCreate(main); }).catch(() => {
+      if (me === visit) main.replaceChildren(Object.assign(document.createElement("p"), { className: "error", textContent: "This page couldn’t load. Reload to try again." }));
+    });
+  }
   for (const a of document.querySelectorAll<HTMLAnchorElement>(".nav a")) {
     if (match(a.pathname).page === route.page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");

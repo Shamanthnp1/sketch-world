@@ -131,19 +131,7 @@ button:disabled { background: var(--kraft); color: var(--muted); box-shadow: non
 .card > * + * { margin-top: var(--s3); }
 .card > .actions { margin-top: var(--s5); }
 
-/* HUD: one paper strip over the world; its controls are flat on the strip */
-.hud { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); width: fit-content; max-width: 100%; padding: var(--s1);
-  border: 1px solid transparent; border-radius: 28px; background: var(--sheet); box-shadow: var(--shadow-lift); }
-.hud-title { padding: 0 var(--s3) 0 var(--s4); font: 400 1.125rem/1.2 var(--font-display); overflow-wrap: anywhere; }
-.hud button { min-height: 44px; padding: 0 var(--s4); border-radius: var(--r-pill); background: none; box-shadow: none; font-size: 0.9375rem; }
-.hud button:hover { background: var(--paper); transform: none; box-shadow: none; }
-.hud button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
-.hud button.primary { background: var(--accent); }
-.hud button:disabled { background: none; }
-@media (max-width: 599px) {
-  .hud { width: 100%; border-radius: 22px; }
-  .hud-title { flex-basis: 100%; padding-block: var(--s2) var(--s1); }
-}
+/* The HUD's rules live in src/ui/hud.css. */
 
 /* Progress steps: an <ol>; the current step's card folds up like a pop-up, done steps stand in ink */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }

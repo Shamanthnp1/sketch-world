@@ -9,7 +9,7 @@ export const WIDTHS = [4, 10, 22] as const;
 export type Width = (typeof WIDTHS)[number];
 export interface Pt { x: number; y: number }
 export interface Stroke { width: Width; pts: Pt[] }
-export interface Pad { undo(): void; clear(): void; exportPng(): Promise<Blob> }
+export interface Pad { undo(): void; clear(): void; isEmpty(): boolean; exportPng(): Promise<Blob> }
 
 /** Strokes in drawing order. Only the stroke being drawn takes new points. */
 export class StrokeModel {
@@ -119,6 +119,7 @@ export function createPad(host: HTMLElement): Pad {
   const pad: Pad = {
     undo() { model.undo(); redraw(); },
     clear() { model.clear(); redraw(); },
+    isEmpty: () => !model.strokes.length,
     exportPng: () => new Promise((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not export the drawing."))), "image/png")),
   };

@@ -1,17 +1,12 @@
-// Site pages inside the static shell of index.html (header, footer, toasts). Each page is a placeholder until its
-// task builds it: Home 7.7, Create 7.5, Gallery and the /w/:id Viewer 9.5. Templates are static markup; user
+// Site pages inside the static shell of index.html (header, footer, toasts). Home is src/ui/home.ts; the others are
+// placeholders until their task builds them: Create 7.5, Gallery and the /w/:id Viewer 9.5. Templates are static markup; user
 // strings (the world id) go into the DOM only via textContent (Requirement 17.18).
 import { match, type Route } from "../router";
+import { mountHome } from "./home";
 import "./shell.css";
 
 const PAGES: Record<Route["page"], { title: string; html: string }> = {
-  home: { title: "", html: `
-    <section class="stack" aria-labelledby="home-h">
-      <h1 class="display" id="home-h">Walk into your drawing</h1>
-      <p class="lede">Photograph a drawing on paper, or draw one here. Sketch World cuts out every object and stands
-        it up as a paper pop-up world you can walk through.</p>
-      <div class="actions"><a class="btn primary" href="/create">Make a world</a><a class="btn" href="/gallery">Browse the gallery</a></div>
-    </section>` },
+  home: { title: "", html: "" }, // src/ui/home.ts renders it
   create: { title: "Make a world", html: `
     <div class="stack">
       <h1>Make a world</h1>
@@ -73,6 +68,7 @@ export function showPage(main: HTMLElement, route: Route, first: boolean): void 
   const page = PAGES[route.page];
   document.title = page.title ? `${page.title} · Sketch World` : "Sketch World";
   main.innerHTML = page.html;
+  if (route.page === "home") mountHome(main);
   for (const a of document.querySelectorAll<HTMLAnchorElement>(".nav a")) {
     if (match(a.pathname).page === route.page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");

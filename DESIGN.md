@@ -110,7 +110,7 @@ Defined once on `:root` in `src/ui/app.css`. UI code uses the variables, never r
 - One centred column: `--page` (1120px) plus `--margin` on each side (16px, 32px from 720px). The header, `main`
   and the footer text share these edges.
 - Header on the ground, no bar chrome: the mark and wordmark at left, the nav ("Make a world", "Gallery") at right;
-  under ~430px the nav wraps under the wordmark on the same left edge. The current page's link has a 3px ink
+  under 460px the nav always takes its own row under the wordmark, on the same left edge (so the font swap shifts nothing). The current page's link has a 3px ink
   underline (`aria-current="page"`).
 - `main` stacks its blocks 48px apart; inside a block 12px. Card grids use `.grid` (min 300px columns, 32/24px gaps).
 - Works at 360px wide with no sideways scroll. Every control is at least 44px tall (buttons 48px).
@@ -141,6 +141,10 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
   and leaves after 4 s. For confirmations only, never for errors.
 - **Error** (`.error`): `--err-bg` with `--err-ink` text, 14px, `--r`, inside the block that failed, `role="alert"`.
   It says what went wrong and what to do next.
+- **Gallery strip** (`renderGalleryStrip(host, items)` in `src/ui/home.ts`, styles in `app.css`): a `ul.strip` of
+  `a.world-card` prints, each a `--sheet` card on its `--edge` with a 4:3 thumbnail (`width`/`height` set, lazy) and
+  the title in Young Serif 18px via `textContent`, linking to `/w/:id`; hover lifts it 2px. With no items it shows
+  `.strip-empty`: four `--kraft` slots cut as cards lying flat, and one sentence saying worlds appear there.
 - **Focus**: `:focus-visible` draws a 3px `--ink` outline 3px out on every control and link. Never removed.
 - **Forced colours**: buttons, cards, the HUD and toasts carry a transparent 1px border so they keep an edge when the
   system replaces fills and shadows.
@@ -152,6 +156,29 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
 - `prefers-reduced-motion: reduce` stops every animation and transition and the hover/press movement; the current
   step's card then simply stands upright.
 
+## Home (`src/ui/home.ts`, `src/ui/home.css`)
+
+Home follows the landing-page rules of `design-taste-frontend` (direction "Colour chapters"): full-width chapters
+butted edge to edge, each keeping the shell's column inside `.wrap`; nothing else on the site uses them.
+
+- **Hero** on `--paper`: the one `h1.display` ("Walk into / your drawing", two authored lines), one lede, the primary
+  "Make a world" and the secondary "Walk a sample world", beside the **pop-up book**: an inline-SVG open book
+  (`--kraft-2` cover, `--sheet` pages, `--kraft` page edges) with cut-out cards standing on its pages. Each card is
+  the shared line art drawn twice, a thick `--sheet` stroke as the paper edge (`.cut`) under 4px `--ink` pen lines
+  (`.ink`), with a soft drop shadow; the sun is the accent disc. Under the book: "Pause motion" (`aria-pressed`) and
+  "Fold it flat" / "Pop it up", which folds the cards down onto the pages in turn and back up.
+- **Draw, photo, walk**: an `ol` of three fields, `--kraft` | `--sheet` | `--ink` (sheet text), the outer two running
+  on to the screen edges. Each shows the same drawing further along (on paper with a yellow pencil; photographed with
+  the four corner dots and Spark's name tags; standing as cut-outs on a paper island) over its step name (`h3`, 22px)
+  and one sentence. On phones the fields stack full width.
+- **Worlds people made**: `h2`, a link to the Gallery and the gallery strip.
+- **Motion** (transform and opacity only): the headline lines rise from their baseline (800ms, the second 110ms
+  later), then the lede and actions fade up; the cards fold up one after another with a slight overshoot (750ms).
+  Idle, from the World's motion table: tree and flowers sway ±2.5°, the cloud drifts, the bird loops and flaps, the
+  person wanders with small hops and turns, the sun pulses 3%; the house and hill stay still. Each chapter's parts
+  rise in once as they enter. Reduced motion shows everything at rest and hides "Pause motion".
+- No three.js, images or third-party art on Home, and no inline `style` attributes (CSP).
+
 ## Routes and the shell
 
 - `src/router.ts`: a History-API router. `match(path)` maps `/`, `/create`, `/gallery` and `/w/:id` (10 base62
@@ -160,7 +187,7 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
   `/a/*`, and modified clicks load normally. Back and forward work; the Worker's SPA fallback serves `index.html`.
 - `index.html` holds the shell (skip link, header, footer, the toast region) so it paints before any script runs.
 - `src/ui/shell.ts` fills `main` per route and sets the title ("Gallery · Sketch World") and the current nav link.
-  Its pages are placeholders until Home (7.7), Create (7.5), and Gallery and the Viewer (9.5) replace them.
+  Home is `src/ui/home.ts`; the other pages are placeholders until Create (7.5), and Gallery and the Viewer (9.5) replace them. The footer stays hidden while `main` is empty, so it never paints and then jumps.
 - Page templates are static markup. User strings (titles, labels, ids, server messages) go into the DOM only via
   `textContent`.
 

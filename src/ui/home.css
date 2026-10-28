@@ -1,0 +1,131 @@
+/* Home page (src/ui/home.ts): colour chapters on the paper ground, butted edge to edge. Tokens from app.css only.
+   The page runs full width; each chapter keeps the shell's column inside .wrap. */
+main:has(> .home) { max-width: none; padding: 0; gap: 0; }
+.home { --spring: cubic-bezier(0.34, 1.45, 0.64, 1); display: grid; }
+.home .wrap { width: 100%; max-width: calc(var(--page) + 2 * var(--margin)); margin-inline: auto; padding-inline: var(--margin); }
+
+/* Paper cut-outs drawn from the shared line art: a white edge (.cut) under pen lines (.ink) */
+.home .cut { fill: var(--sheet); stroke: var(--sheet); stroke-width: 18; stroke-linejoin: round; stroke-linecap: round; }
+.home .ink { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
+.home .ink.thin { stroke-width: 5; }
+.home .ink.hill { fill: var(--kraft); }
+.home .page { fill: var(--sheet); }
+
+/* Hero: the headline and its actions beside the pop-up book */
+.hero { padding-block: var(--s5) var(--s8); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--s6); align-items: center;
+  min-height: min(calc(100svh - 240px), 580px); }
+.hero-text { display: grid; gap: var(--s6); justify-items: start; }
+.hero h1 .line { display: block; overflow: hidden; padding-block: 0.06em 0.16em; margin-block: -0.06em -0.16em; white-space: nowrap; }
+.hero h1 .line > span { display: block; animation: line-up 800ms cubic-bezier(0.2, 0.75, 0.2, 1) backwards; }
+.hero h1 .line + .line > span { animation-delay: 110ms; }
+.hero .lede, .hero .actions { animation: fade-up 500ms var(--ease) 380ms backwards; }
+.hero .lede { max-width: 40ch; text-wrap: pretty; }
+.hero .actions .btn { flex: 1 1 auto; } /* when they wrap on a phone, both tabs span the column */
+@keyframes line-up { from { transform: translateY(105%); } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } }
+
+.hero-art { display: grid; justify-items: end; }
+.hero-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s3); margin-top: calc(-1 * var(--s2)); }
+.pause-btn[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+.book-scene.paused svg { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .pause-btn { display: none; } } /* nothing moves, so nothing to pause */
+.book-scene { position: relative; width: 100%; aspect-ratio: 640 / 480; perspective: 1000px; perspective-origin: 50% 0; }
+.book { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 8px rgb(52 40 22 / 0.22)); } /* paper shadow, DESIGN.md taste-skill-ignore */
+.book .cover { fill: var(--kraft-2); }
+.book .edge { fill: var(--kraft); }
+.book .gutter { fill: var(--paper); }
+
+/* Each pop-up card stands on the page at (--x, --y) in the book's 640 x 480 units, folds up in turn on load and
+   folds flat with the button. The inner svg carries the idle motion from the World's motion table. */
+.pop { position: absolute; left: calc(var(--x) / 640 * 100%); bottom: calc((480 - var(--y)) / 480 * 100%); width: calc(var(--w) / 640 * 100%);
+  transform-origin: 50% 100%; animation: pop-in 750ms var(--spring) calc(300ms + var(--d) * 1ms) backwards;
+  transition: transform 600ms var(--spring) calc(var(--d) * 0.6ms); }
+.pop > svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 3px 3px rgb(52 40 22 / 0.28)); } /* paper shadow, DESIGN.md taste-skill-ignore */
+.book-scene.flat .pop { transform: rotateX(84deg); transition: transform 450ms var(--ease) calc(var(--d) * 0.4ms); }
+@keyframes pop-in { from { transform: rotateX(84deg); } }
+.p-sun { --x: 452; --y: 282; --w: 92; --d: 80; }
+.p-hill { --x: 60; --y: 294; --w: 520; --d: 0; }
+.p-house { --x: 300; --y: 364; --w: 140; --d: 170; }
+.p-tree { --x: 112; --y: 372; --w: 104; --d: 250; }
+.p-flower-a { --x: 74; --y: 416; --w: 46; --d: 330; }
+.p-person { --x: 232; --y: 408; --w: 50; --d: 400; }
+.p-flower-b { --x: 476; --y: 420; --w: 46; --d: 450; }
+.p-cloud { --x: 58; --y: 154; --w: 168; --d: 520; }
+.p-bird { --x: 262; --y: 116; --w: 78; --d: 580; }
+.tab { fill: var(--sheet); }
+
+.sway { transform-origin: 50% 100%; animation: sway 3.4s ease-in-out infinite alternate; }
+.p-flower-a .sway { animation-duration: 2.6s; animation-delay: -1s; }
+.p-flower-b .sway { animation-duration: 3s; animation-delay: -2s; }
+.glow { transform-origin: 50% 25%; animation: glow 2.4s ease-in-out infinite alternate; }
+.drift { animation: drift 9s ease-in-out infinite alternate; }
+.fly { animation: fly 8s linear infinite, flap 450ms ease-in-out infinite alternate; }
+.wander { transform-origin: 50% 100%; animation: wander 7s linear infinite; }
+@keyframes sway { from { rotate: -2.5deg; } to { rotate: 2.5deg; } }
+@keyframes glow { to { scale: 1.03; } }
+@keyframes drift { from { translate: -10px 0; } to { translate: 16px 0; } }
+@keyframes fly { 25% { translate: 22px -10px; } 50% { translate: 44px 0; } 75% { translate: 22px 8px; } }
+@keyframes flap { to { scale: 1 0.55; } }
+@keyframes wander {
+  0%, 100% { translate: 0 0; scale: 1 1; }
+  8% { translate: 4px -5px; } 16% { translate: 8px 0; } 24% { translate: 12px -5px; } 32% { translate: 16px 0; }
+  40% { translate: 20px -5px; } 48% { translate: 24px 0; scale: 1 1; } 52% { translate: 24px 0; scale: -1 1; }
+  60% { translate: 20px -5px; } 68% { translate: 16px 0; } 76% { translate: 12px -5px; } 84% { translate: 8px 0; }
+  92% { translate: 4px -5px; scale: -1 1; } 96% { translate: 0 0; scale: 1 1; }
+}
+
+/* Draw, photo, walk: three fields butted together; the outer two run on to the screen edges */
+.how { overflow: clip; }
+.how .wrap { position: relative; }
+.how h2 { position: absolute; z-index: 1; top: var(--s7); left: var(--margin); font-size: var(--fs-title); line-height: 1.1; }
+.how ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.how li { position: relative; display: grid; grid-template-rows: 1fr auto 1fr auto auto; min-height: clamp(520px, 72svh, 640px);
+  padding: calc(var(--s7) + var(--s8)) var(--s6) var(--s7); }
+.how li:first-child { padding-left: 0; }
+.how li:last-child { padding-right: 0; }
+.how h3 { grid-row: 4; font: 400 var(--fs-heading)/1.2 var(--font-display); letter-spacing: -0.01em; }
+.how li p { grid-row: 5; margin-top: var(--s3); }
+.how-pic { grid-row: 2; justify-self: center; width: 100%; max-width: 340px; height: auto; }
+.f-draw { background: var(--kraft); }
+.f-photo { background: var(--sheet); }
+.f-walk { background: var(--ink); color: var(--sheet); }
+.f-draw::before, .f-walk::after { content: ""; position: absolute; top: 0; bottom: 0; width: 100vw; background: inherit; }
+.f-draw::before { right: 100%; }
+.f-walk::after { left: 100%; }
+.how .nib { fill: var(--ink); }
+.how .desk { fill: var(--kraft); }
+.how .corner circle { fill: var(--accent); stroke: var(--ink); stroke-width: 3; }
+.how .tag rect { fill: var(--ink); }
+.how .tag text { fill: var(--sheet); font: 600 15px var(--font); text-anchor: middle; }
+.how .island { fill: var(--kraft); }
+
+/* Worlds people made: the gallery strip on the paper ground */
+.gal { padding-block: calc(2 * var(--s8)) var(--s8); }
+.gal .wrap { display: grid; gap: var(--s6); }
+.gal-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s2) var(--s6); }
+.gal h2 { font-size: var(--fs-title); line-height: 1.1; }
+.gal-head a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+
+/* Entrances: a .reveal block's parts rise in once, heading first; home.ts only adds .pending when motion is allowed */
+.reveal > * { transition: opacity 600ms var(--ease), translate 600ms var(--ease); }
+.reveal.pending > * { opacity: 0; translate: 0 24px; }
+.reveal > :nth-child(2) { transition-delay: 80ms; }
+.reveal > :nth-child(3) { transition-delay: 160ms; }
+
+@media (max-width: 1023px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: var(--s7); }
+  .hero-art { justify-items: start; }
+  .hero-controls { justify-content: flex-start; }
+}
+@media (max-width: 859px) {
+  .how .wrap { padding-inline: 0; }
+  .how h2 { position: static; padding: var(--s7) var(--margin) 0; background: var(--kraft); }
+  .how ol { grid-template-columns: minmax(0, 1fr); }
+  .how li, .how li:first-child, .how li:last-child { grid-template-rows: none; min-height: 0; padding: var(--s6) var(--margin) var(--s7); }
+  .how h3 { grid-row: 1; }
+  .how li p { grid-row: 2; }
+  .how-pic { grid-row: 3; margin-top: var(--s6); justify-self: start; }
+  .f-draw::before, .f-walk::after { content: none; }
+  .gal { padding-block: var(--s8) var(--s7); }
+}

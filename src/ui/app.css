@@ -83,6 +83,7 @@ a:hover { text-decoration-thickness: 2px; }
 .face { fill: var(--sheet); }
 .fold { fill: var(--kraft-2); }
 .nav { display: flex; margin-inline: calc(-1 * var(--s3)); } /* link text on the column edges, also when it wraps under the brand */
+@media (max-width: 459px) { .nav { flex-basis: 100%; } } /* wrap on phones whichever font has loaded, so the swap shifts nothing */
 .nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s3); font-weight: 600; font-size: 0.9375rem;
   text-decoration: none; }
 .nav a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 7px; }
@@ -92,6 +93,7 @@ main { flex: 1; display: grid; gap: var(--s7); align-content: start; padding-blo
 main > * { min-width: 0; }
 
 .foot { margin-top: auto; }
+main:empty ~ .foot { visibility: hidden; } /* until the page fills main, so the footer never paints and then jumps (CLS) */
 .hills { display: block; width: 100%; height: clamp(110px, 14vw, 190px); }
 .hills .back { fill: var(--kraft-2); }
 .hills .mid { fill: var(--kraft); }
@@ -165,7 +167,20 @@ button:disabled { background: var(--kraft); color: var(--muted); box-shadow: non
 
 .error { padding: var(--s3) var(--s4); border-radius: var(--r); background: var(--err-bg); color: var(--err-ink); font-size: var(--fs-small); }
 
+/* Gallery strip (renderGalleryStrip in src/ui/home.ts): world cards as prints on a second sheet; empty slots lie flat */
+.strip { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s6) var(--s5); grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.world-card { display: grid; gap: var(--s3); padding: var(--s2) var(--s2) var(--s3); border: 1px solid transparent; border-radius: var(--r);
+  background: var(--sheet); box-shadow: var(--edge); text-decoration: none; transition: transform 120ms var(--ease); }
+.world-card:hover { transform: translateY(-2px); }
+.world-card img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; background: var(--kraft); }
+.world-card-title { padding-inline: var(--s2); font: 400 1.125rem/1.25 var(--font-display); overflow-wrap: anywhere; }
+.strip-empty { display: grid; gap: var(--s5); }
+.strip-slots { display: grid; gap: var(--s5); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.strip-slots span { aspect-ratio: 3 / 1; background: var(--kraft); clip-path: polygon(9% 0, 91% 0, 100% 100%, 0 100%); } /* a card lying flat */
+@media (max-width: 599px) { .strip-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   button:hover, .btn:hover, button:active, .btn:active { transform: none; }
+  .world-card:hover { transform: none; }
 }

@@ -28,7 +28,7 @@ export function motionRow(kind: Placed["kind"], type: ObjType): MotionRow {
 
 export function motion(kind: Placed["kind"], type: ObjType, id: number, t: number, rm: boolean): Motion {
   const row = motionRow(kind, type);
-  if (rm || row === "static" || !Number.isFinite(t)) return { dx: 0, dy: 0, dz: 0, rotZ: 0, flip: false };
+  if (rm || row === "static" || !Number.isFinite(TAU * t)) return { dx: 0, dy: 0, dz: 0, rotZ: 0, flip: false }; // TAU·t: |t| ≳ 2.9e307 overflows, sin(∞) is NaN
   const wave = (period: number) => (TAU * t) / period + phase(id);
   switch (row) {
     case "wander": { // flat loop 0.8 × 0.4 around home, a hop every 0.6 s; dx = R·cos a moves left while sin a > 0

@@ -115,3 +115,31 @@ Change: `rainbow` is now a sky type, and the scene prompt tells Spark to skip de
 - **Not re-checked live**: the ground-as-`field` entries and the grass dots ("flower ×10") came from ms1–ms3, which weren't re-run. Neither 1.jpeg nor 2.jpeg had ground listed at the gate, so the ground part of the fix is untested live.
 
 Spend: 2 understand calls (both on attempt 1 in the `wrangler dev` log, so no hidden retries) and 12 SAM calls, $0.05 at the design.md fixed estimates. Live gate spend including this re-check: **$0.23**.
+
+## Deployed (task 11.2)
+
+Date: 2026-10-28
+
+URL: **https://sketch-world.shamanthnp.workers.dev** (workers.dev only; no routes, custom domains or DNS changes). Version id `9268a1b5-951b-49e1-8b41-2db4626f67b9`, deployed with wrangler 4.153.0 by `npx wrangler deploy --secrets-file .dev.vars` from commit `fb4fcd3` plus the cap change.
+
+Before creating anything, the shared account (b48bb45c…f753) had D1 `undo-manual-db`, R2 `undo-manual-images` and `wastatus-videos`, and no Worker `sketch-world`. None of them was changed.
+
+| Resource | Name | Notes |
+|---|---|---|
+| Worker | `sketch-world` | Static Assets from `dist/` (27 files), Worker first for `/api/*` and `/a/*` |
+| D1 | `sketch-world-db` | id `0f1a2aeb-08bd-431b-b6ce-eed4db5af212`, region APAC; `0001_init.sql` applied remotely (tables `worlds`, `usage`, `checks`) |
+| R2 | `sketch-world-assets` | Standard storage class, empty |
+| Rate limits | `RL_UNDERSTAND` 74031, `RL_POINT` 74032, `RL_SEGMENT` 74033, `RL_BACKDROP` 74034, `RL_SAVE` 74035 | 6/60 s each, `RL_SEGMENT` 30/60 s; no namespace conflict reported |
+| Var | `DAILY_COST_CAP_USD` = `"2"` | **$2 per UTC day** (lowered from $5 at the user's request), about 40–57 worlds a day at the design.md estimate of $0.035–0.05 each |
+| Var | `SAMPLE_WORLD_IDS` = `""` | Set in task 11.3 |
+| Secret | `MODEL_API_KEY` | `wrangler secret list` shows it by name, type `secret_text` |
+
+Post-deploy smoke, with no model calls (the remote `usage` table has 0 rows afterwards):
+
+| Request | Result |
+|---|---|
+| `HEAD /`, `/create`, `/gallery` | 200 `text/html`, each with `content-security-policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'` and `x-content-type-options: nosniff` |
+| `GET /api/gallery` | 200 `{"worlds":[],"samples":[]}` |
+| `GET /api/worlds/abcdefghij` | 404 `{"error":"World not found"}` |
+| `GET /a/w/abcdefghij/thumb.jpg` | 404 `{"error":"Not found"}` |
+| `PUT /api/gallery` | 405 `{"error":"Method not allowed"}`, `Allow: GET` |

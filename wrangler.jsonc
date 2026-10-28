@@ -18,8 +18,7 @@
     {
       "binding": "DB",
       "database_name": "sketch-world-db",
-      // Placeholder until task 11.2 creates the database; a deploy with it fails instead of auto-provisioning.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "0f1a2aeb-08bd-431b-b6ce-eed4db5af212",
       "migrations_dir": "migrations"
     }
   ],
@@ -33,7 +32,8 @@
     { "name": "RL_SAVE", "namespace_id": "74035", "simple": { "limit": 6, "period": 60 } }
   ],
   "vars": {
-    "DAILY_COST_CAP_USD": "5",
+    // Deployed cap: $2 per UTC day (the code falls back to $5 only if this is missing or not a number).
+    "DAILY_COST_CAP_USD": "2",
     "SAMPLE_WORLD_IDS": ""
   },
   // Value comes from .dev.vars locally and `wrangler deploy --secrets-file .dev.vars` when deployed.

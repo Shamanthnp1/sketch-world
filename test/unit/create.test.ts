@@ -63,7 +63,7 @@ describe("noteText", () => {
   it("says why a Minimal_Scene can't be saved, lists the nouns not found, and is empty for neither", () => {
     expect(noteText({ saveable: true, notFound: [] })).toBe("");
     expect(noteText({ saveable: true, notFound: ["sun", "cat"] })).toBe("Not found in your drawing: sun, cat.");
-    expect(noteText({ saveable: false, notFound: [] })).toMatch(/one card\. This world can’t be saved\.$/);
+    expect(noteText({ saveable: false, notFound: [] })).toMatch(/one card\. You can’t save this world\.$/);
   });
 });
 

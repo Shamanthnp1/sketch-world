@@ -94,7 +94,7 @@ export function minimalWorld(work: WorkPixels): { work: WorkPixels; instances: I
 /** The note under the HUD strip: why a Minimal_Scene can't be saved, and the nouns not found; "" for neither. */
 export function noteText(c: Pick<CreatedWorld, "saveable" | "notFound">): string {
   return [
-    c.saveable ? "" : "We couldn’t tell the things in your drawing apart, so it stands as one card. This world can’t be saved.",
+    c.saveable ? "" : "Sketch World couldn’t tell the things in your drawing apart, so your drawing stands as one card. You can’t save this world.",
     c.notFound.length ? `Not found in your drawing: ${c.notFound.join(", ")}.` : "",
   ].filter(Boolean).join(" ");
 }
@@ -121,7 +121,7 @@ const TEMPLATE = `
   <div class="create-choices" data-view="choices">
     <section class="card create-choice" aria-labelledby="cc-photo">
       <h2 id="cc-photo">Photo of a drawing</h2>
-      <p>Take a photo of your drawing, then mark its four corners so the paper lies flat.</p>
+      <p>Take a photo of your drawing, then mark its 4 corners so the paper lies flat.</p>
       <div class="actions">
         <button type="button" class="primary" data-a="choose">Choose a photo</button>
         <button type="button" class="create-take" data-a="take">Take a photo</button>
@@ -148,7 +148,7 @@ const TEMPLATE = `
   </section>
   <div class="create-corners" data-view="corners" hidden></div>
   <section class="card create-progress" data-view="progress" aria-labelledby="cg-h" hidden>
-    <h2 id="cg-h" tabindex="-1">Making your world</h2>
+    <h2 id="cg-h" tabindex="-1">Making your world…</h2>
     <ol class="steps"><li></li><li></li><li></li></ol>
     <p class="meta">This takes up to a minute.</p>
   </section>
@@ -252,7 +252,9 @@ export function mountCreate(main: HTMLElement): () => void {
     host.setAttribute("aria-label", "Your world");
     const world = await openWorld(host, { instances: c.instances, work: c.work, reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
     let walk: Walk | undefined, hud: Hud | undefined;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault(); // a reload or closed tab would lose the world
     closeWorld = () => {
+      removeEventListener("beforeunload", warn);
       hud?.dispose();
       walk?.dispose();
       world.dispose();
@@ -263,21 +265,33 @@ export function mountCreate(main: HTMLElement): () => void {
     };
     if (me !== run) return closeWorld(); // left the page while three.js loaded
     main.append(host);
+    addEventListener("beforeunload", warn);
     for (const e of chrome) e.hidden = true;
     show("world");
     walk = attachWalk(world, host);
     host.focus(); // before the HUD, whose help dialog may take focus on a first visit
     created = { ...c, world };
     hud = mountHud(host, world, { title: c.scene.title }); // 9.5: onSave: created.saveable ? () => save(created) : undefined
-    const another = el("button", "", "Make another");
-    another.type = "button";
-    another.addEventListener("click", () => {
+    // Make another closes this world for good, so it asks first, in a dialog styled like the HUD's help.
+    const another = el("button", "", "Make another"), ask = el("dialog", "hud-help create-ask");
+    const askH = el("h2", "", "Make another world?"), acts = el("div", "actions");
+    const go = el("button", "primary", "Make another"), stay = el("button", "", "Keep this world");
+    another.type = go.type = stay.type = "button";
+    askH.id = "create-ask-h";
+    ask.setAttribute("aria-labelledby", askH.id);
+    acts.append(go, stay);
+    ask.append(askH, el("p", "", "This world closes and can’t be opened again."), acts);
+    ask.addEventListener("keydown", (e) => e.stopPropagation()); // keys stay in the dialog: nothing walks behind it
+    another.addEventListener("click", () => ask.showModal());
+    stay.addEventListener("click", () => ask.close());
+    go.addEventListener("click", () => {
       closeWorld?.();
       pad?.clear(); // Undo on the pad still brings the drawing back
       show("choices", btn("choose"));
       scrollTo(0, 0);
     });
     hud.bar.append(another);
+    hud.bar.parentElement!.append(ask); // the HUD layer, whose button and dialog rules style it
     // A paper slip, not a toast: it isn't a confirmation, and it must stay until read (DESIGN.md "Toast").
     const text = noteText(c);
     if (text) {

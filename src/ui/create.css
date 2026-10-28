@@ -23,3 +23,5 @@ main > .create-world { position: fixed; inset: 0; z-index: 10; background: var(-
 .create-note { display: flex; align-items: center; gap: var(--s2); max-width: min(30rem, 100%); padding: var(--s1) var(--s1) var(--s1) var(--s4);
   border: 1px solid transparent; border-radius: var(--r); background: var(--sheet); box-shadow: var(--shadow-lift); }
 .create-note p { font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere; }
+/* "Make another world?": the HUD's help dialog (hud.css .hud-help) with a sentence and two buttons. */
+.create-ask p { margin-bottom: var(--s5); }

@@ -205,11 +205,15 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
 - **Corners**: `pickCorners` (`src/ui/corners.ts`); Cancel returns to the choices.
 - **Progress**: a `.card` "Making your world" with the `ol.steps` and "This takes up to a minute."; a visually hidden
   polite status says each step as it starts. The heading takes focus.
-- **Failed**: a `.card` with an `h2`, the `.error` (the Worker's own words for 422, a short reason otherwise) and one
-  primary: "Try another picture" (photo) or "Back to my drawing" (pad, the drawing kept).
-- **World**: the host covers the window and the site header and footer hide; the HUD strip gains "Make another".
-  Objects not found, and why a Minimal_Scene can't be saved, go on one paper slip under the strip (`.create-note`,
-  `--sheet` with `--shadow-lift`, Dismiss), never in a toast.
+- **Failed**: a `.card` with an `h2`, the `.error` (the Worker's own words for 422, a short reason otherwise),
+  "Try another picture" (photo) or "Back to my drawing" (pad, the drawing kept), and, when the picture wasn't the
+  problem (429, 503, 5xx, no network), a primary "Try again" that sends the same drawing again.
+- **World**: the host covers the window and the site header and footer hide; the HUD strip gains "Make another",
+  which asks first in a dialog styled like Controls help ("Make another" / "Keep this world"), and a reload or
+  closed tab asks the browser's own question. Objects not found, and why a Minimal_Scene can't be saved, go on one
+  paper slip under the strip (`.create-note`, `--sheet` with `--shadow-lift`, Dismiss), never in a toast.
+- **Minimal_Scene** (after a 502): the trimmed drawing on a white page 3 × its longer side wide, so its one hill Card
+  shows whole from the spawn point.
 
 ## Routes and the shell
 

@@ -34,10 +34,12 @@ afterEach(() => vi.restoreAllMocks());
 
 it("sends one Muse Image call with the exact tool settings and replies with the PNG as image/png", async () => {
   const fetch = museImage(fixture);
+  const timeout = vi.spyOn(AbortSignal, "timeout");
 
   const res = await ask({ title: TITLE, style: "sketch", prompt: INJECTION });
 
   expect(res.status).toBe(200);
+  expect(timeout).toHaveBeenCalledWith(90_000);    // Muse Image gets longer than metaFetch's 30 s default
   expect(res.headers.get("Content-Type")).toBe("image/png");
   expect(new Uint8Array(await res.arrayBuffer())).toEqual(pngBytes);
   expect(fetch).toHaveBeenCalledTimes(1);

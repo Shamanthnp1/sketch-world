@@ -14,8 +14,6 @@ it.each([
 });
 
 it.each([
-  ["POST", "/api/backdrop"],
-  ["POST", "/api/worlds"],
   ["GET", "/api/worlds/abc"],
   ["DELETE", "/api/worlds/abc"],
   ["GET", "/api/gallery"],

@@ -14,6 +14,7 @@ export interface MetaCall {
   model: MetaModel;
   path: `/${string}`;               // e.g. "/responses"
   body: Record<string, unknown>;    // JSON body; metaFetch sets `model`
+  timeoutMs?: number;               // per attempt; default TIMEOUT_MS
 }
 
 // Injectable for tests; defaults are the real platform functions.
@@ -48,7 +49,7 @@ export async function metaFetch(env: Pick<Env, "MODEL_API_KEY">, call: MetaCall,
     let res: Response | undefined;
     let failure = "";
     try {
-      res = await doFetch(BASE_URL + call.path, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      res = await doFetch(BASE_URL + call.path, { ...init, signal: AbortSignal.timeout(call.timeoutMs ?? TIMEOUT_MS) });
     } catch (err) {
       // Timeout or network error: retried like a 5xx. Log the error name only.
       failure = err instanceof Error && err.name === "TimeoutError" ? "timeout" : "error";

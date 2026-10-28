@@ -20,6 +20,9 @@ export const IMAGE_TOOLS = [{
   size: "1536x1024",
 }];
 
+// Per attempt. Muse Image can take longer than metaFetch's 30 s default (npm run smoke allows 120 s).
+export const BACKDROP_TIMEOUT_MS = 90_000;
+
 // The title rule allows no double quote and no line break, so the title cannot leave its quoted slot.
 export const backdropPrompt = (style: BackdropStyle, title: string): string => [
   "Paint a wide sky panorama to hang behind a pop-up book world, where paper cut-outs stand on an open page.",
@@ -40,7 +43,7 @@ export const backdropBody = (style: BackdropStyle, title: string): Record<string
 // One Muse Image call. Returns the PNG bytes from the image_generation_call item.
 // A reply without a PNG throws MetaApiError, the same 502 as a failed call.
 export async function askBackdrop(env: Pick<Env, "MODEL_API_KEY">, style: BackdropStyle, title: string): Promise<Uint8Array<ArrayBuffer>> {
-  const res = await metaFetch(env, { route: "backdrop", model: "muse-image-1.0", path: "/responses", body: backdropBody(style, title) });
+  const res = await metaFetch(env, { route: "backdrop", model: "muse-image-1.0", path: "/responses", body: backdropBody(style, title), timeoutMs: BACKDROP_TIMEOUT_MS });
   const reply = ImageReply.safeParse(await res.json().catch(() => null));
   const result = reply.success ? reply.data.output.find((o) => o.type === "image_generation_call" && o.result)?.result : null;
   const png = result ? fromBase64(result) : null;

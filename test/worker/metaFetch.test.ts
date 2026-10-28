@@ -115,4 +115,16 @@ it("honours Retry-After given as an HTTP date", async () => {
   expect(waits[0]).toBeLessThanOrEqual(3000);
 });
 
+it("times out each attempt at 30 s by default, or at the call's timeoutMs", async () => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  const timeout = vi.spyOn(AbortSignal, "timeout");
+  const fetch = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+
+  await metaFetch(env, call, { fetch });
+  await metaFetch(env, { ...call, timeoutMs: 90_000 }, { fetch });
+
+  expect(timeout.mock.calls).toEqual([[30_000], [90_000]]);
+  expect(JSON.parse(String(fetch.mock.calls[1]![1].body))).toEqual({ input: "secret prompt", model: "muse-image-1.0" });    // not sent
+});
+
 // The router's MetaApiError → 502/422 mapping is tested with the routes that call metaFetch (2.4, 8.1).

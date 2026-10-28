@@ -1,6 +1,7 @@
 // POST /api/understand: Spark reads the Work_Image into a SparkScene (Requirements 3.2, 3.6, 3.8, 3.9, 12.8).
 // Multipart: `image` (JPEG or PNG, ≤ 400 KB). The browser sends no prompt text.
 import { SparkScene } from "../../shared/scene";
+import { sha256Hex } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readImage } from "../limits/input";
@@ -47,9 +48,4 @@ function parseJson(text: string): unknown {
   } catch {
     return undefined;
   }
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
 }

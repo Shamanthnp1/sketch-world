@@ -214,6 +214,12 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
   paper slip under the strip (`.create-note`, `--sheet` with `--shadow-lift`, Dismiss), never in a toast.
 - **Minimal_Scene** (after a 502): the trimmed drawing on a white page 3 × its longer side wide, so its one hill Card
   shows whole from the spawn point.
+- **Sky** (`src/world/build.ts`): Muse Image's panorama on a sphere around the player, twice around with its edges
+  crossfaded (no seam, no mirror line), at the same scale up as across; its painted horizon fades into one haze colour,
+  which the fog shares, so the ground runs into the sky without a line. Until it arrives, and when it can't be painted
+  (no message: the gradient is a complete sky), a vertical gradient from the ground colour (`groundColour`, tinted
+  towards white) at the horizon to a soft blue (`#a9c7df`) from about 50° up. The one colour gradient on the site:
+  it's the World's sky, never a page surface. The Minimal_Scene always has the gradient.
 
 ## Routes and the shell
 

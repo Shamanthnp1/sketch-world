@@ -193,6 +193,24 @@ butted edge to edge, each keeping the shell's column inside `.wrap`; nothing els
   rise in once as they enter. Reduced motion shows everything at rest and hides "Pause motion".
 - No three.js, images or third-party art on Home, and no inline `style` attributes (CSP).
 
+## Create (`src/ui/create.ts`, `src/ui/create.css`)
+
+App-screen rules, loaded with `import()` from the shell; three.js loads only when the world opens.
+
+- **Choices**: `h1` "Make a world", one lede, then two `.card`s side by side from 720px (stacked below): "Photo of a
+  drawing" (primary "Choose a photo", plus "Take a photo" with the camera on coarse pointers only) and "Draw here"
+  ("Start drawing"). Each card's buttons sit on one line at its foot. One privacy line under both.
+- **Draw here**: the pad sized so its tools, the canvas and the actions fit one screen; primary "Make my world" and
+  "Back". An empty pad gets an `.error` ("Draw something first") instead of a request.
+- **Corners**: `pickCorners` (`src/ui/corners.ts`); Cancel returns to the choices.
+- **Progress**: a `.card` "Making your world" with the `ol.steps` and "This takes up to a minute."; a visually hidden
+  polite status says each step as it starts. The heading takes focus.
+- **Failed**: a `.card` with an `h2`, the `.error` (the Worker's own words for 422, a short reason otherwise) and one
+  primary: "Try another picture" (photo) or "Back to my drawing" (pad, the drawing kept).
+- **World**: the host covers the window and the site header and footer hide; the HUD strip gains "Make another".
+  Objects not found, and why a Minimal_Scene can't be saved, go on one paper slip under the strip (`.create-note`,
+  `--sheet` with `--shadow-lift`, Dismiss), never in a toast.
+
 ## Routes and the shell
 
 - `src/router.ts`: a History-API router. `match(path)` maps `/`, `/create`, `/gallery` and `/w/:id` (10 base62

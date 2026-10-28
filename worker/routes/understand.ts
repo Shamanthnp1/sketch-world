@@ -1,6 +1,7 @@
-// POST /api/understand: Spark reads the Work_Image into a SparkScene (Requirements 3.2, 3.6, 3.8, 3.9, 12.8).
+// POST /api/understand: Spark reads the Work_Image into a SparkScene (Requirements 3.2, 3.6, 3.8, 3.9, 11.7, 12.8).
 // Multipart: `image` (JPEG or PNG, ≤ 400 KB). The browser sends no prompt text.
 import { SparkScene } from "../../shared/scene";
+import { reserveCall } from "../cost";
 import { sha256Hex } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo } from "../limits/imageSize";
@@ -25,7 +26,10 @@ export async function understand(req: Request, env: Env): Promise<Response> {
 
   let scene: SparkScene | undefined;
   for (let attempt = 1; attempt <= ATTEMPTS && !scene; attempt++) {
-    // Task 10.2 inserts the Spark cost reserve here, once per attempt. A MetaApiError propagates (router → 502).
+    // Each attempt reserves the Spark estimate first, so the retry reserves again (Requirements 3.6, 11.5).
+    // Refused → the 503 {mode: "sample"} with no Spark call. A MetaApiError propagates (router → 502).
+    const refused = await reserveCall(env, "spark");
+    if (refused) return refused;
     const parsed = SparkScene.safeParse(parseJson(await askScene(env, bytes, info.type)));
     if (parsed.success) scene = parsed.data;
     // Field paths only, never values: the reply describes the user's drawing.

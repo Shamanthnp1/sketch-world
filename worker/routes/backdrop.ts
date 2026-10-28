@@ -1,6 +1,8 @@
 // POST /api/backdrop: Muse Image paints the sky panorama (Requirements 9.2, 9.3, 9.4, 9.5, 12.2).
 // JSON {title, style}: title by the Scene_Schema title rule, style one of BACKDROP_STYLES. The browser sends no
-// prompt text. Reply: the PNG as image/png; a content policy refusal → 422; any other failure → 502.
+// prompt text. Reply: the PNG as image/png; a content policy refusal → 422; any other failure → 502; the daily
+// cost cap reached → 503 {mode: "sample"} (Requirement 11.7).
+import { reserveCall } from "../cost";
 import { jsonError } from "../http";
 import { parseJson, readBody } from "../limits/input";
 import { askBackdrop, BACKDROP_STYLES, BackdropRequest } from "../meta/image";
@@ -16,7 +18,9 @@ export async function backdrop(req: Request, env: Env): Promise<Response> {
   const body = BackdropRequest.safeParse(parseJson(raw));
   if (!body.success) return jsonError(400, BAD_BODY);
 
-  // Task 10.2 inserts the Muse Image cost reserve here (rate limits are applied in the router, task 10.1).
+  // Reserve the Muse Image estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no call.
+  const refused = await reserveCall(env, "image");
+  if (refused) return refused;
   let png: Uint8Array<ArrayBuffer>;
   try {
     png = await askBackdrop(env, body.data.style, body.data.title);

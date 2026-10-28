@@ -1,7 +1,8 @@
-// POST /api/point: Spark boxes for the scene objects SAM missed by name (Requirements 5.1, 5.2, 12.2).
+// POST /api/point: Spark boxes for the scene objects SAM missed by name (Requirements 5.1, 5.2, 11.7, 12.2).
 // Multipart: `image` (JPEG or PNG, ≤ 400 KB) and `objects` (JSON [{type, noun, count}], 1–12 entries).
 // The browser sends no prompt text. Reply: {boxes: [{objIndex, box: {x0, y0, x1, y1}}]} on Spark's 0–1000 grid,
 // at most `count` boxes per object, in Spark's order; the browser scales them to pixels.
+import { reserveCall } from "../cost";
 import { jsonError } from "../http";
 import { imageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readImage, readJsonField } from "../limits/input";
@@ -29,7 +30,10 @@ export async function point(req: Request, env: Env): Promise<Response> {
 
   let reply: SparkBoxes | undefined;
   for (let attempt = 1; attempt <= ATTEMPTS && !reply; attempt++) {
-    // Task 10.2 inserts the Spark cost reserve here, once per attempt. A MetaApiError propagates (router → 502).
+    // Each attempt reserves the Spark estimate first (Requirement 11.5); refused → the 503 {mode: "sample"}
+    // with no Spark call. A MetaApiError propagates (router → 502).
+    const refused = await reserveCall(env, "spark");
+    if (refused) return refused;
     const parsed = SparkBoxes.safeParse(parseJson(await askPoint(env, bytes, info.type, objects.data)));
     if (parsed.success) reply = parsed.data;
     // Field paths only, never values: the reply describes the user's drawing.

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi, type MockInstance } from "vitest
 import drawing from "../fixtures/images/line-drawing.png?inline";
 import fixture from "../fixtures/meta/understand-line-drawing.json";    // Spark's real scene reply for that drawing
 import { SPARK_SCENE_JSON_SCHEMA } from "../../shared/scene";
+import { CAP_REACHED, capMicro, COST_MICRO } from "../../worker/cost";
 import { MAX_IMAGE_BYTES } from "../../worker/limits/input";
 import { SCENE_INSTRUCTIONS } from "../../worker/meta/spark";
 
@@ -40,10 +41,16 @@ function spark(...texts: string[]) {
   return fetch;
 }
 
+// The cost tests here run on their own UTC days in 2000, so their usage rows are not the ones other tests reserve on.
+const CAP = capMicro(env.DAILY_COST_CAP_USD);
+const onDay = (day: string) => vi.spyOn(Date, "now").mockReturnValue(Date.parse(`${day}T12:00:00Z`));
+const spent = async (day: string) => await env.DB.prepare("SELECT spent_micro FROM usage WHERE day = ?1").bind(day).first<number>("spent_micro");
+
 let consoleSpies: MockInstance[] = [];
 const logged = () => consoleSpies.flatMap((s) => s.mock.calls.flat().map(String)).join("\n");
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM checks WHERE sha256 = ?1").bind(SHA256).run();
+  await env.DB.prepare("DELETE FROM usage WHERE day LIKE '2000-%'").run();
   consoleSpies = [vi.spyOn(console, "log"), vi.spyOn(console, "error")].map((s) => s.mockImplementation(() => {}));
 });
 afterEach(() => vi.restoreAllMocks());
@@ -102,6 +109,31 @@ it.each([
   expect(await res.json()).toEqual(scene);
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(await checks()).toEqual([{ safe: 1 }]);
+});
+
+it("reserves the Spark estimate again for the retry (Requirement 3.6)", async () => {
+  onDay("2000-01-01");
+  const fetch = spark(unknownType, SCENE_TEXT);
+
+  const res = await understand(form({ image: png(drawingBytes) }));
+
+  expect(res.status).toBe(200);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(await spent("2000-01-01")).toBe(2 * COST_MICRO.spark);
+});
+
+it("replies 503 {mode: 'sample'} with no second Spark call when the cap has room for one attempt only", async () => {
+  onDay("2000-01-02");
+  await env.DB.prepare("INSERT INTO usage (day, spent_micro) VALUES (?1, ?2)").bind("2000-01-02", CAP - COST_MICRO.spark).run();
+  const fetch = spark(unknownType);
+
+  const res = await understand(form({ image: png(drawingBytes) }));
+
+  expect(res.status).toBe(503);
+  expect(await res.json()).toEqual({ mode: "sample", error: CAP_REACHED });
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(await spent("2000-01-02")).toBe(CAP);    // the first attempt's reservation, the retry's refused
+  expect(await checks()).toEqual([]);
 });
 
 it("replies 502 after two invalid replies, stores no checks row and logs no reply content", async () => {

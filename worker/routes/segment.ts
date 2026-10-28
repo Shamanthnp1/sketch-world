@@ -1,7 +1,8 @@
-// POST /api/segment: one sam-3.1 call on the Work_Image (Requirements 4.1, 4.2, 12.5).
+// POST /api/segment: one sam-3.1 call on the Work_Image (Requirements 4.1, 4.2, 11.7, 12.5).
 // Multipart: `image` (JPEG or PNG, ≤ 400 KB) and exactly one prompt: `noun` (a scene noun) or
 // `box` (PxBox JSON in the image's pixel coordinates, from /api/point).
 import { buildObjectPrompt } from "@meta-sam/parser";
+import { reserveCall } from "../cost";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readBox, readImage, readNoun } from "../limits/input";
@@ -24,7 +25,9 @@ export async function segment(req: Request, env: Env): Promise<Response> {
   const text = promptText(form, info);
   if (text instanceof Response) return text;
 
-  // Task 10.2 inserts the SAM cost reserve here (rate limits are applied in the router, task 10.1).
+  // Reserve the SAM estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no SAM call.
+  const refused = await reserveCall(env, "sam");
+  if (refused) return refused;
   const res = await metaFetch(env, {
     route: "segment",
     model: "sam-3.1",

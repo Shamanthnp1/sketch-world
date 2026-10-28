@@ -14,7 +14,7 @@
 /* With the section scrolled to the top, the pad fits the screen with its tools above and Make my world below. */
 .create-pad .pad-canvas { width: min(100%, calc(max(240px, 100svh - 15rem) * 4 / 3)); }
 
-.create-progress, .create-fail { width: 100%; max-width: 36rem; }
+.create-progress, .create-fail, .create-sample { width: 100%; max-width: 36rem; }
 
 /* The world: the whole window (design.md "World"), while create.ts hides the site header and footer. */
 main > .create-world { position: fixed; inset: 0; z-index: 10; background: var(--paper); }

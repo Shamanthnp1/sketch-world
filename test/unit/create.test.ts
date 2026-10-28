@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { SparkScene } from "../../shared/scene";
 import { ApiError } from "../../src/api";
-import { canResend, errorText, MINIMAL_SCENE, minimalWorld, missingNouns, noteText, objectCount, stepNames } from "../../src/ui/create";
+import { SegmentError } from "../../src/sam/client";
+import {
+  canResend, errorText, isSampleMode, MINIMAL_SCENE, minimalWorld, missingNouns, noteText, objectCount, openError, PHOTO_TOO_LARGE, stepNames,
+} from "../../src/ui/create";
 import { layout } from "../../src/world/layout";
 import { Z_BACK } from "../../src/world/space";
 
@@ -40,6 +43,26 @@ describe("errorText", () => {
     expect(new Set(texts).size).toBe(3);
     for (const t of texts) expect(t).not.toMatch(/field/);
     expect(errorText(new TypeError("Failed to fetch"))).toBe(errorText(new ApiError(500, "boom")));
+  });
+});
+
+describe("isSampleMode", () => {
+  it("is the daily cap's 503 {mode: \"sample\"} from understand/point (ApiError) or segment (SegmentError) only", () => {
+    expect(isSampleMode(new ApiError(503, "Daily budget used up", "sample"))).toBe(true);
+    expect(isSampleMode(new SegmentError(503, "sample"))).toBe(true);
+    expect(isSampleMode(new ApiError(503, "Service unavailable"))).toBe(false); // a busy server: try again in a minute
+    expect(isSampleMode(new ApiError(429, "x", "sample"))).toBe(false);
+    expect(isSampleMode(new SegmentError(503))).toBe(false);
+    expect(isSampleMode(new TypeError("Failed to fetch"))).toBe(false);
+  });
+});
+
+describe("photo errors", () => {
+  it("says a non-picture file isn't a picture, and an undecodable picture may be too large or unreadable", () => {
+    expect(openError("application/pdf")).toMatch(/^That file isn’t a picture\./);
+    expect(openError("image/heic")).toMatch(/too large, or in a format this browser can’t read/);
+    expect(openError("")).toBe(openError("image/jpeg")); // no type from the picker: assume a picture
+    expect(PHOTO_TOO_LARGE).toMatch(/too large to work with/);
   });
 });
 

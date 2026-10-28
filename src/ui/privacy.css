@@ -1,0 +1,12 @@
+/* Privacy notice (src/ui/privacy.ts): a modal paper card on its second sheet, like the HUD's Controls help.
+   Buttons, h2 and .actions come from app.css. */
+.privacy {
+  width: min(30rem, calc(100% - 2 * var(--s4))); max-height: calc(100% - 2 * var(--s4)); overflow: auto; overscroll-behavior: contain;
+  padding: var(--s5);
+  border: 1px solid transparent; border-radius: var(--r);
+  background: var(--sheet); color: var(--ink);
+  box-shadow: var(--edge);
+}
+.privacy::backdrop { background: rgb(23 35 49 / 0.4); } /* ink at 40%; ::backdrop doesn't inherit the page tokens */
+.privacy h2 { margin-bottom: var(--s3); }
+.privacy ul { margin: 0 0 var(--s5); padding-left: 1.25em; display: grid; gap: var(--s2); line-height: 1.5; max-width: 65ch; }

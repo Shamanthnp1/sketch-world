@@ -1,10 +1,10 @@
-// The Create page at /create (task 7.5; Requirements 1.6, 2.5, 3.7, 3.10, 5.9, 7.8, 17.7, 17.8): two choices,
+// The Create page at /create (tasks 7.5, 10.5; Requirements 1.6, 2.5, 3.7, 3.10, 5.9, 7.8, 11.3, 11.8, 12.1, 17.7, 17.8): two choices,
 // "Photo of a drawing" (corners → flatten → autoLevel) and "Draw here" (the pad PNG as is), then the Work_Image →
 // POST /api/understand → the cut-out chain → the World_View with walking and the HUD, behind staged progress.
 // shell.ts loads this module with import(), so Home's entry chunk stays small; three.js stays behind openWorld.
 // The raw photo never leaves the browser: only the Work_Image JPEG is sent. User strings via textContent only.
 import type { SparkScene } from "../../shared/scene";
-import { ApiError, backdrop, saveMoves, understand } from "../api";
+import { ApiError, backdrop, getGallery, saveMoves, understand } from "../api";
 import { buildInstances, type WorkPixels } from "../cut/chain";
 import { chainIO } from "../cut/io";
 import { thresholdMask } from "../cut/threshold";
@@ -12,6 +12,7 @@ import type { Instance } from "../cut/types";
 import { pixels, workImage } from "../image/encode";
 import { createPad, type Pad } from "../pad/pad";
 import { autoLevel, flatten } from "../paper/flatten";
+import { SegmentError } from "../sam/client";
 import { saveWorld, type Saved } from "../share/save";
 import type { World } from "../world/build";
 import { groundColour } from "../world/ground";
@@ -19,6 +20,7 @@ import { openWorld } from "../world/open";
 import { attachWalk, type Walk } from "../world/walk";
 import { pickCorners } from "./corners";
 import { mountHud, shareUrl, type Hud } from "./hud";
+import { askPrivacy } from "./privacy";
 import { toast } from "./shell";
 import "./create.css";
 
@@ -38,7 +40,8 @@ export function errorText(e: unknown): string {
   if (!(e instanceof ApiError)) return GENERIC;
   switch (e.status) {
     case 422: return e.message;
-    case 429: case 503: return "Lots of worlds are being made right now. Please try again in a minute."; // 10.5 adds Sample_Mode for 503
+    // 429: rate limited (Requirement 11.3). A 503 without {mode: "sample"} (isSampleMode) is a busy server, not the cap.
+    case 429: case 503: return "Lots of worlds are being made right now. Please try again in a minute.";
     case 413: return "That picture is too large to send. Try a smaller one.";
     case 415: return "That picture’s format can’t be read. Try a JPEG or PNG.";
     case 400: return "That picture couldn’t be sent. Try another one.";
@@ -48,6 +51,18 @@ export function errorText(e: unknown): string {
 
 /** Whether sending the same Work_Image again can work: not after 422 (not a drawing) or 400/413/415 (bad input). */
 export const canResend = (e: unknown) => !(e instanceof ApiError && [400, 413, 415, 422].includes(e.status));
+
+/** The daily cost cap's reply, 503 {mode: "sample"} (Requirement 11.7), from any route: the page goes to Sample_Mode. */
+export const isSampleMode = (e: unknown) =>
+  (e instanceof ApiError || e instanceof SegmentError) && e.status === 503 && e.mode === "sample";
+
+/** Why a chosen file couldn't be decoded: it isn't a picture at all, or the browser can't read this one. */
+export const openError = (type: string) => type && !type.startsWith("image/")
+  ? "That file isn’t a picture. Choose a JPEG or PNG photo of your drawing."
+  : "That photo couldn’t be opened. It may be too large, or in a format this browser can’t read. Try a JPEG or PNG.";
+
+/** The photo decoded, but flattening or encoding it ran out of memory or wouldn't fit 400 KB. */
+export const PHOTO_TOO_LARGE = "That photo is too large to work with on this device. Try a smaller photo, or a screenshot of it.";
 
 /** The nouns of the scene objects the chain found nothing for (Requirement 5.9), in scene order, each once. */
 export const missingNouns = (scene: Pick<SparkScene, "objects">, notFound: readonly number[]) =>
@@ -116,7 +131,7 @@ export interface CreatedWorld {
 }
 
 type Work = { canvas: OffscreenCanvas; jpeg: Blob };
-type View = "choices" | "pad" | "corners" | "progress" | "fail" | "world";
+type View = "choices" | "pad" | "corners" | "progress" | "fail" | "sample" | "world";
 
 const TEMPLATE = `
   <div class="stack create-intro">
@@ -139,7 +154,7 @@ const TEMPLATE = `
       <p>Draw in black on white with a mouse, a pen or your finger.</p>
       <div class="actions"><button type="button" data-a="draw">Start drawing</button></div>
     </section>
-    <p class="meta create-privacy">Your photo stays on this device; only the flattened drawing is sent.</p>
+    <p class="meta create-privacy">Only your drawing is sent to Meta’s AI models. A photo of it stays on this device.</p>
   </div>
   <section class="create-pad" data-view="pad" aria-labelledby="cd-h" hidden>
     <h2 id="cd-h" tabindex="-1">Draw here</h2>
@@ -165,6 +180,15 @@ const TEMPLATE = `
       <button type="button" class="primary" data-a="retry"></button>
     </div>
   </section>
+  <section class="card create-sample" data-view="sample" aria-labelledby="cs-h" hidden>
+    <h2 id="cs-h" tabindex="-1">No more new worlds today</h2>
+    <p>Today’s free budget for making worlds is used up. Please come back tomorrow to make yours. Until then, you can walk a sample world or see the worlds people made.</p>
+    <div class="actions">
+      <a class="btn primary" href="/gallery" data-sample>Walk a sample world</a>
+      <a class="btn" href="/gallery">See the gallery</a>
+      <button type="button" data-a="sample-back"></button>
+    </div>
+  </section>
   <p class="vh" role="status" data-live></p>`;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ""): HTMLElementTagNameMap[K] {
@@ -179,7 +203,7 @@ export function mountCreate(main: HTMLElement): () => void {
   const views = main.querySelectorAll<HTMLElement>("[data-view]"), lede = $(".lede"), live = $("[data-live]");
   const padHost = $(".create-pad-host"), padErr = $<HTMLParagraphElement>(".create-pad .error");
   const steps = [...main.querySelectorAll<HTMLLIElement>(".steps li")], failText = $(".create-fail .error");
-  const retry = btn("retry"), again = btn("again");
+  const retry = btn("retry"), again = btn("again"), sampleLink = $<HTMLAnchorElement>("[data-sample]");
   const chrome = document.querySelectorAll<HTMLElement>(".skip, .bar, .foot"); // the site header and footer, hidden under a world
 
   let pad: Pad | null = null;
@@ -220,6 +244,17 @@ export function mountCreate(main: HTMLElement): () => void {
     live.textContent = "";
   }
 
+  /** Sample_Mode (Requirement 11.8): the daily cap is reached. The pad keeps the drawing; the samples and Gallery need no model. */
+  function sampleMode(): void {
+    btn("sample-back").textContent = from === "pad" ? "Back to my drawing" : "Try another picture";
+    show("sample");
+    live.textContent = "";
+    // Walk a sample world opens the Gallery until the reply names a sample (as on Home). A late reply is harmless.
+    void getGallery().then((g) => {
+      if (g.samples[0]) sampleLink.href = `/w/${encodeURIComponent(g.samples[0].id)}`;
+    }, () => {});
+  }
+
   /** Work_Image → understand → chain → world. `me` is this run's number. */
   async function make(me: number, work: () => Promise<Work>): Promise<void> {
     stage(0);
@@ -244,12 +279,21 @@ export function mountCreate(main: HTMLElement): () => void {
       // network) keeps the gradient (9.6), so it is dropped without a word.
       const sky: { png?: Blob | null } = {};
       const painted = backdrop(scene.title).catch(() => null).then((png) => (sky.png = png));
-      const { instances, notFound } = await buildInstances(scene, px, chainIO(jpeg));
+      // A failed segment or point call is a miss for its stage (the chain catches it); this only notes the daily cap.
+      let capped = false;
+      const io = chainIO(jpeg), miss = (e: unknown): never => { capped ||= isSampleMode(e); throw e; };
+      const { instances, notFound } = await buildInstances(scene, px, {
+        segment: (p) => io.segment(p).catch(miss), point: (o) => io.point(o).catch(miss),
+      });
       if (me !== run) return;
+      if (capped && !instances.length) return sampleMode(); // the cap, not the drawing, left nothing to stand up
       stage(2, n);
       await open(me, { scene, work: px, jpeg, instances, notFound: missingNouns(scene, notFound), saveable: true }, sky.png === undefined ? painted : sky.png);
     } catch (e) {
-      if (me === run) fail(errorText(e), canResend(e) ? sent : null);
+      if (me !== run) return;
+      if (isSampleMode(e)) return sampleMode();
+      if (!sent && from === "photo") return fail(PHOTO_TOO_LARGE); // work() failed: the photo decoded but is too big to flatten
+      fail(errorText(e), canResend(e) ? sent : null);
     }
   }
 
@@ -369,9 +413,15 @@ export function mountCreate(main: HTMLElement): () => void {
     try {
       photo = await createImageBitmap(file, { imageOrientation: "from-image" });
     } catch {
-      return fail("That file couldn’t be opened as a picture. Try a JPEG or PNG photo.");
+      return fail(openError(file.type));
     }
     if (me !== run) return photo.close();
+    // The privacy notice before the first upload (Requirement 12.1), before the corner taps so Not now loses no work.
+    if (!(await askPrivacy(main)) || me !== run) {
+      photo.close();
+      if (me === run) show("choices", btn("choose"));
+      return;
+    }
     show("corners");
     const q = await pickCorners($(".create-corners"), photo).catch(() => null);
     if (me !== run) return photo.close();
@@ -395,9 +445,10 @@ export function mountCreate(main: HTMLElement): () => void {
       padErr.textContent = "Draw something first, then choose Make my world.";
       return;
     }
+    const p = pad, me = ++run;
+    if (!(await askPrivacy(main)) || me !== run) return; // Not now: back on the pad, the drawing kept
     from = "pad";
-    const p = pad;
-    await make(++run, async () => {
+    await make(me, async () => {
       const bmp = await createImageBitmap(await p.exportPng());
       try { return await workImage(bmp); } finally { bmp.close(); }
     });
@@ -416,7 +467,9 @@ export function mountCreate(main: HTMLElement): () => void {
   padHost.addEventListener("pointerdown", () => { padErr.hidden = true; });
   btn("make").addEventListener("click", () => void fromPad());
   btn("back").addEventListener("click", () => show("choices", btn("draw")));
-  retry.addEventListener("click", () => (from === "pad" ? show("pad") : show("choices", btn("choose"))));
+  const back = () => (from === "pad" ? show("pad") : show("choices", btn("choose")));
+  retry.addEventListener("click", back);
+  btn("sample-back").addEventListener("click", back);
   again.addEventListener("click", () => {
     const w = sentLast;
     if (w) void make(++run, async () => w);

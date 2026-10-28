@@ -1,4 +1,27 @@
+// POST /api/backdrop: Muse Image paints the sky panorama (Requirements 9.2, 9.3, 9.4, 9.5, 12.2).
+// JSON {title, style}: title by the Scene_Schema title rule, style one of BACKDROP_STYLES. The browser sends no
+// prompt text. Reply: the PNG as image/png; a content policy refusal → 422; any other failure → 502.
 import { jsonError } from "../http";
+import { askBackdrop, BACKDROP_STYLES, BackdropRequest } from "../meta/image";
+import { MetaApiError } from "../meta/metaFetch";
 
-// Stub until task 8.1.
-export const backdrop = async (): Promise<Response> => jsonError(501, "Not implemented");
+const MAX_BODY_BYTES = 1024;    // a 60-character title and a style fit in well under 1 KB
+const BAD_BODY = `Expected JSON {title, style}: a title of 1–60 letters, digits, spaces or ',.!?- and a style of ${BACKDROP_STYLES.join(", ")}`;
+export const POLICY_REFUSED = "The image model refused this backdrop under its content policy";
+
+export async function backdrop(req: Request, env: Env): Promise<Response> {
+  if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) return jsonError(413, "Request body is too large");
+  const body = BackdropRequest.safeParse(await req.json().catch(() => undefined));
+  if (!body.success) return jsonError(400, BAD_BODY);
+
+  // Task 10.2 inserts the Muse Image cost reserve here (rate limits are applied in the router, task 10.1).
+  let png: Uint8Array<ArrayBuffer>;
+  try {
+    png = await askBackdrop(env, body.data.style, body.data.title);
+  } catch (err) {
+    // Any other MetaApiError propagates (router → 502).
+    if (err instanceof MetaApiError && err.code === "content_policy_violation") return jsonError(422, POLICY_REFUSED);
+    throw err;
+  }
+  return new Response(png, { headers: { "Content-Type": "image/png" } });
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "type": "server_error",
+    "code": "server_error",
+    "param": null,
+    "message": "The server had an error while processing your request."
+  }
+}

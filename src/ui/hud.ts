@@ -111,27 +111,28 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   function nudge(d: Nudge): void {
     const c = sel;
     if (!c) return;
-    if (c.kind === "terrain") return say(`${c.label} can't be moved`);
+    if (c.kind === "terrain") return say(`${c.label} can’t be moved`);
     const k = nudgeDelta(c.kind, d, world.camera.rotation.y); // walk keeps the camera's yaw in rotation.y
     const moved = world.place(c, { x: c.pos.x + k.x, y: c.pos.y + k.y, z: c.pos.z + k.z });
-    say(`${c.label} ${moved ? "moved" : "can't move"} ${word(c.kind, d)}`);
+    say(`${c.label} ${moved ? "moved" : "can’t move"} ${word(c.kind, d)}`);
   }
 
   for (const c of world.cards) {
     const b = button(c.label), li = el("li");
     b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => select(sel === c ? null : c));
-    b.addEventListener("keydown", (e) => {
-      const d = KEYS.get(e.key);
-      if (!d || e.altKey || e.ctrlKey || e.metaKey || ((d === "raise" || d === "lower") && c.kind !== "float")) return;
-      e.preventDefault(); // walk skips keys a control already used, and the page doesn't scroll
-      if (sel !== c) select(c);
-      nudge(d);
-    });
     li.append(b);
     list.append(li);
     rows.set(c, b);
   }
+  // Arrow keys anywhere in the panel nudge the selected Card; on a row they first select that row's Card.
+  panel.addEventListener("keydown", (e) => {
+    const d = KEYS.get(e.key), c = [...rows].find(([, b]) => b === e.target)?.[0] ?? sel;
+    if (!d || !c || e.altKey || e.ctrlKey || e.metaKey || ((d === "raise" || d === "lower") && c.kind !== "float")) return;
+    e.preventDefault(); // walk skips keys a control already used, and the page doesn't scroll
+    if (sel !== c) select(c);
+    nudge(d);
+  });
   for (const [d, glyph, name] of [["up", "↑", ""], ["left", "←", "Move left"], ["down", "↓", ""], ["right", "→", "Move right"]] as const) {
     const b = button(glyph, `hud-${d}`);
     if (name) b.setAttribute("aria-label", name);
@@ -162,7 +163,22 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
     pause.setAttribute("aria-pressed", String(on));
     world.setPaused(on);
   });
-  reset.addEventListener("click", () => { world.reset(); say("Positions reset"); });
+  // Reset positions can be undone: the button says "Undo reset" until something moves again.
+  let undo: Vec3[] | null = null;
+  const setUndo = (u: Vec3[] | null) => { undo = u; reset.textContent = u ? "Undo reset" : "Reset positions"; };
+  reset.addEventListener("click", () => {
+    if (undo) {
+      world.cards.forEach((c, i) => { c.pos = undo![i]; });
+      setUndo(null);
+      return say("Positions put back");
+    }
+    if (!Object.keys(world.moves()).length) return say("Nothing has been moved yet");
+    const before = world.cards.map((c) => c.pos);
+    world.reset();
+    setUndo(before);
+    say("Positions reset. Undo reset puts them back.");
+  });
+  const offFrame = world.onFrame(() => { if (undo && Object.keys(world.moves()).length) setUndo(null); });
 
   // Controls help: a modal dialog on the first visit, again from Help.
   const dialog = el("dialog", "hud-help"), dh = el("h2", "", "Controls"), steps = el("ul"), ok = button("Got it", "primary");
@@ -183,6 +199,7 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
   return {
     bar,
     dispose() {
+      offFrame();
       world.select(null);
       layer.remove();
     },

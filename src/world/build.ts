@@ -289,10 +289,11 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
   function tap(cx: number, cy: number): Card | null {
     const c = pick(cx, cy) as Live | null;
     if (!c) return null;
-    const r = host.getBoundingClientRect();
     label.textContent = c.label; // user strings only via textContent (Requirement 12.4)
-    label.style.left = `${cx - r.left}px`;
-    label.style.top = `${cy - r.top}px`;
+    // Above the pointer, kept 8 px inside the world (the label is centred on `left` and sits 12 px above `top`).
+    const r = host.getBoundingClientRect(), hw = label.offsetWidth / 2 + 8;
+    label.style.left = `${Math.min(Math.max(cx - r.left, hw), r.width - hw)}px`;
+    label.style.top = `${Math.max(cy - r.top, label.offsetHeight + 20)}px`;
     label.classList.add("on");
     clearTimeout(hideLabel);
     hideLabel = window.setTimeout(() => label.classList.remove("on"), LABEL_MS);

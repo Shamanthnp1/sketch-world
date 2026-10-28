@@ -33,9 +33,12 @@
   background: none; color: inherit; box-shadow: none; transform: none;
   font: 600 0.9375rem/1.2 var(--font, system-ui, sans-serif);
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  transition: background-color 120ms;
+  transition: none; /* fills change at once (DESIGN.md Motion: transform and opacity only), also over app.css */
 }
-@media (hover: hover) { .hud-layer button:hover { background: var(--paper, #e7e2d8); } } /* no sticky hover after a tap */
+@media (hover: hover) { /* no sticky hover after a tap */
+  .hud-layer button:hover { background: var(--paper, #e7e2d8); }
+  .hud-layer button.primary:not([aria-disabled="true"]):hover { background: color-mix(in srgb, var(--accent, #ffc533) 85%, var(--ink, #172331)); }
+}
 .hud-layer button[aria-pressed="true"] { background: var(--ink, #172331); color: var(--sheet, #fff); }
 .hud-layer button.primary { background: var(--accent, #ffc533); }
 .hud-layer button:disabled, .hud-layer button[aria-disabled="true"] { background: none; color: var(--muted, #58524a); cursor: not-allowed; }
@@ -97,4 +100,3 @@
 @media (forced-colors: active) {
   .hud-layer button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
 }
-@media (prefers-reduced-motion: reduce) { .hud-layer button { transition: none; } }

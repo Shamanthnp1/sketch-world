@@ -132,6 +132,20 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
   world title (`.hud-title`, Young Serif 18px, set via `textContent`) and pill buttons flat on the strip: hover
   `--paper`, a toggle uses `aria-pressed` and turns ink with sheet text when on, Save & share is the accent. Under
   600px the strip spans the width and the title takes its own row.
+  - Built by `mountHud(host, world, {title, onSave?})` in `src/ui/hud.ts` with its own `src/ui/hud.css` (tokens with
+    fallbacks, so the `?probe` overlay shows the same HUD). Strip order: title (`h1`), Objects (`aria-expanded`),
+    Pause motion (`aria-pressed`, hidden with reduced motion), Reset positions, Help, Save & share. Until `onSave`
+    exists Save & share is `aria-disabled` with "Saving is coming soon" as its description, so it stays focusable.
+  - Reset positions turns into "Undo reset" until something moves again (no immediate destructive action).
+  - **Objects panel**: a `--sheet` sheet under the strip (320px, full width under 600px) with an `h2`, one hint, a
+    list of toggle rows (one per Card, by label; the selected row is ink and its Card is tinted accent with an ink
+    ring) that scrolls on its own, and a 48px paper arrow pad (plus Raise/Lower for things that fly). Arrow keys
+    anywhere in the panel nudge the selected Card; hills and mountains say they stay put. Moves are announced in a
+    polite status region.
+  - **Controls help**: a modal `dialog` card on its `--edge` (keys and mouse, or touch, by `pointer: coarse`), shown
+    on the first visit (`localStorage`) and from Help; Got it or Escape closes it.
+  - On coarse pointers the HUD keeps clear of walk's touch buttons (bottom padding 152px plus the safe area), and
+    the tap label stays inside the world, wrapping long names.
 - **Progress steps** (`ol.steps`, for Create in 7.5): a real ordered list of plain step names ("Reading your
   drawing", "Cutting out 6 objects", "Popping up your world"). Each step has a small paper card: pending lies flat
   (`--kraft`, tilted back), the current step (`aria-current="step"`) is the accent card folding up and down, a done

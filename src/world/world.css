@@ -12,7 +12,7 @@
   border-radius: var(--r, 3px);
   box-shadow: var(--shadow, 0 1px 1px rgb(52 40 22 / 0.12), 0 4px 10px -3px rgb(52 40 22 / 0.24));
   font: 18px/1.2 var(--font-display, "Young Serif", Georgia, serif);
-  white-space: nowrap;
+  width: max-content; max-width: calc(100% - 24px); overflow-wrap: anywhere; text-align: center; /* a 40-letter noun at 360 px */
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms;

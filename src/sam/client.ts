@@ -25,10 +25,11 @@ export interface SamClientOptions {
   base?: string;                 // origin of the Worker; "" means same origin
 }
 
-/** Rejection for a non-2xx reply; `status` and `mode` (the reply's {mode}) let the caller spot 503 {mode: "sample"}. */
+/** Rejection for a non-2xx reply; `status`, `mode` and `reason` (the reply's {mode, reason}) let the caller spot
+ *  503 {mode: "sample"} and which cap it was. */
 export class SegmentError extends Error {
   override name = "SegmentError";
-  constructor(readonly status: number, readonly mode?: string) {
+  constructor(readonly status: number, readonly mode?: string, readonly reason?: string) {
     super(`Segment request failed (${status})`);
   }
 }
@@ -75,8 +76,8 @@ export class SamClient {
         continue;
       }
       if (!res.ok) {
-        const { mode } = ((await res.json().catch(() => null)) ?? {}) as { mode?: unknown };
-        throw new SegmentError(res.status, typeof mode === "string" ? mode : undefined);
+        const { mode, reason } = ((await res.json().catch(() => null)) ?? {}) as { mode?: unknown; reason?: unknown };
+        throw new SegmentError(res.status, typeof mode === "string" ? mode : undefined, typeof reason === "string" ? reason : undefined);
       }
       const { outputText } = (await res.json()) as { outputText?: unknown };
       if (typeof outputText !== "string") throw new Error("Segment reply has no outputText");

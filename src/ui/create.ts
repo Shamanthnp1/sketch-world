@@ -56,6 +56,13 @@ export const canResend = (e: unknown) => !(e instanceof ApiError && [400, 413, 4
 export const isSampleMode = (e: unknown) =>
   (e instanceof ApiError || e instanceof SegmentError) && e.status === 503 && e.mode === "sample";
 
+export const SAMPLE_TEXT = "Today’s free budget for making worlds is used up. Please come back tomorrow to make yours. Until then, you can walk a sample world or see the worlds people made.";
+export const VISITOR_TEXT = "You’ve made a lot of worlds today. Please come back tomorrow, or walk the sample worlds.";
+
+/** The Sample_Mode card's text: this visitor's own daily budget ({reason: "visitor"}), else the whole day's cap. */
+export const sampleText = (e: unknown) =>
+  (e instanceof ApiError || e instanceof SegmentError) && e.reason === "visitor" ? VISITOR_TEXT : SAMPLE_TEXT;
+
 /** Why a chosen file couldn't be decoded: it isn't a picture at all, or the browser can't read this one. */
 export const openError = (type: string) => type && !type.startsWith("image/")
   ? "That file isn’t a picture. Choose a JPEG or PNG photo of your drawing."
@@ -182,7 +189,7 @@ const TEMPLATE = `
   </section>
   <section class="card create-sample" data-view="sample" aria-labelledby="cs-h" hidden>
     <h2 id="cs-h" tabindex="-1">No more new worlds today</h2>
-    <p>Today’s free budget for making worlds is used up. Please come back tomorrow to make yours. Until then, you can walk a sample world or see the worlds people made.</p>
+    <p class="create-sample-text"></p>
     <div class="actions">
       <a class="btn primary" href="/gallery" data-sample>Walk a sample world</a>
       <a class="btn" href="/gallery">See the gallery</a>
@@ -244,8 +251,12 @@ export function mountCreate(main: HTMLElement): () => void {
     live.textContent = "";
   }
 
-  /** Sample_Mode (Requirement 11.8): the daily cap is reached. The pad keeps the drawing; the samples and Gallery need no model. */
-  function sampleMode(): void {
+  /**
+   * Sample_Mode (Requirements 11.7, 11.8): the daily cap, or this visitor's own, is reached (`e` is the 503 that said
+   * which). The pad keeps the drawing; the samples and Gallery need no model.
+   */
+  function sampleMode(e: unknown): void {
+    $(".create-sample-text").textContent = sampleText(e);
     btn("sample-back").textContent = from === "pad" ? "Back to my drawing" : "Try another picture";
     show("sample");
     live.textContent = "";
@@ -280,18 +291,18 @@ export function mountCreate(main: HTMLElement): () => void {
       const sky: { png?: Blob | null } = {};
       const painted = backdrop(scene.title).catch(() => null).then((png) => (sky.png = png));
       // A failed segment or point call is a miss for its stage (the chain catches it); this only notes the daily cap.
-      let capped = false;
-      const io = chainIO(jpeg, () => me === run), miss = (e: unknown): never => { capped ||= isSampleMode(e); throw e; };
+      let capped: unknown = null; // the first 503 {mode: "sample"}
+      const io = chainIO(jpeg, () => me === run), miss = (e: unknown): never => { if (isSampleMode(e)) capped ??= e; throw e; };
       const { instances, notFound } = await buildInstances(scene, px, {
         segment: (p) => io.segment(p).catch(miss), point: (o) => io.point(o).catch(miss),
       });
       if (me !== run) return;
-      if (capped && !instances.length) return sampleMode(); // the cap, not the drawing, left nothing to stand up
+      if (capped && !instances.length) return sampleMode(capped); // the cap, not the drawing, left nothing to stand up
       stage(2, n);
       await open(me, { scene, work: px, jpeg, instances, notFound: missingNouns(scene, notFound), saveable: true }, sky.png === undefined ? painted : sky.png);
     } catch (e) {
       if (me !== run) return;
-      if (isSampleMode(e)) return sampleMode();
+      if (isSampleMode(e)) return sampleMode(e);
       if (!sent && from === "photo") return fail(PHOTO_TOO_LARGE); // work() failed: the photo decoded but is too big to flatten
       fail(errorText(e), canResend(e) ? sent : null);
     }

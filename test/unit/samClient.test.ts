@@ -99,11 +99,11 @@ describe("SamClient", () => {
   });
 
   it("carries the reply's mode on a 503, so the page can spot the daily cap", async () => {
-    const fetch = vi.fn(async () => Response.json({ mode: "sample", error: "Daily budget used up" }, { status: 503 }));
-    await expect(new SamClient({ fetch }).segment(img, { noun: "sun" })).rejects.toMatchObject({ status: 503, mode: "sample" });
+    const fetch = vi.fn(async () => Response.json({ mode: "sample", reason: "visitor", error: "Daily budget used up" }, { status: 503 }));
+    await expect(new SamClient({ fetch }).segment(img, { noun: "sun" })).rejects.toMatchObject({ status: 503, mode: "sample", reason: "visitor" });
     expect(fetch).toHaveBeenCalledTimes(1); // only 429 is retried
     const plain = vi.fn(async () => new Response("<html>busy</html>", { status: 503 }));
-    await expect(new SamClient({ fetch: plain }).segment(img, { noun: "sun" })).rejects.toMatchObject({ status: 503, mode: undefined });
+    await expect(new SamClient({ fetch: plain }).segment(img, { noun: "sun" })).rejects.toMatchObject({ status: 503, mode: undefined, reason: undefined });
   });
 });
 

@@ -3,7 +3,8 @@ import { SparkScene } from "../../shared/scene";
 import { ApiError } from "../../src/api";
 import { SegmentError } from "../../src/sam/client";
 import {
-  canResend, errorText, isSampleMode, MINIMAL_SCENE, minimalWorld, missingNouns, noteText, objectCount, openError, PHOTO_TOO_LARGE, stepNames,
+  canResend, errorText, isSampleMode, MINIMAL_SCENE, minimalWorld, missingNouns, noteText, objectCount, openError, PHOTO_TOO_LARGE,
+  SAMPLE_TEXT, sampleText, stepNames, VISITOR_TEXT,
 } from "../../src/ui/create";
 import { layout } from "../../src/world/layout";
 import { Z_BACK } from "../../src/world/space";
@@ -54,6 +55,15 @@ describe("isSampleMode", () => {
     expect(isSampleMode(new ApiError(429, "x", "sample"))).toBe(false);
     expect(isSampleMode(new SegmentError(503))).toBe(false);
     expect(isSampleMode(new TypeError("Failed to fetch"))).toBe(false);
+  });
+
+  it("shows the visitor's own text for {reason: \"visitor\"}, and the day's budget text otherwise", () => {
+    expect(sampleText(new ApiError(503, "x", "sample", "visitor"))).toBe(VISITOR_TEXT);
+    expect(sampleText(new SegmentError(503, "sample", "visitor"))).toBe(VISITOR_TEXT);
+    expect(VISITOR_TEXT).toBe("You’ve made a lot of worlds today. Please come back tomorrow, or walk the sample worlds.");
+    expect(sampleText(new ApiError(503, "x", "sample", "daily"))).toBe(SAMPLE_TEXT);
+    expect(sampleText(new SegmentError(503, "sample"))).toBe(SAMPLE_TEXT);
+    expect(SAMPLE_TEXT).toMatch(/^Today’s free budget for making worlds is used up\./);
   });
 });
 

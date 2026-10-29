@@ -21,11 +21,11 @@ describe("understand", () => {
     await expect(understand(img)).rejects.toMatchObject({ name: "ApiError", status, message: `msg ${status}` });
   });
 
-  it("carries the reply's {mode} for the daily cap's 503, and none otherwise", async () => {
-    reply(Response.json({ mode: "sample", error: "Daily budget used up" }, { status: 503 }));
-    await expect(understand(img)).rejects.toMatchObject({ status: 503, mode: "sample", message: "Daily budget used up" });
+  it("carries the reply's {mode, reason} for the daily caps' 503, and none otherwise", async () => {
+    reply(Response.json({ mode: "sample", reason: "visitor", error: "Daily budget used up" }, { status: 503 }));
+    await expect(understand(img)).rejects.toMatchObject({ status: 503, mode: "sample", reason: "visitor", message: "Daily budget used up" });
     reply(Response.json({ error: "busy" }, { status: 503 }));
-    await expect(understand(img)).rejects.toMatchObject({ status: 503, mode: undefined });
+    await expect(understand(img)).rejects.toMatchObject({ status: 503, mode: undefined, reason: undefined });
   });
   it("falls back to a generic message when the body has no {error}", async () => {
     reply(new Response("<html>bad gateway</html>", { status: 502 }));

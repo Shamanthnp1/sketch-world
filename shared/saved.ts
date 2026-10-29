@@ -8,6 +8,7 @@ import { ALL_TYPES, NOUN, SparkSceneBase } from "./scene";
 
 export const MAX_SAVED_INSTANCES = 30;
 export const MAX_MOVES = 30;
+export const MAX_IMG_SIDE = 1024; // src/image/encode.ts WORK_MAX_PX
 
 const px = z.number().min(0).max(4096); // z.number() also rejects NaN and ±Infinity
 
@@ -50,7 +51,9 @@ export const SavedScene = z.object({
   v: z.literal(1),
   title: SparkSceneBase.shape.title,
   view: z.enum(["side", "top"]),
-  img: z.object({ w: z.number().int().min(1).max(4096), h: z.number().int().min(1).max(4096) }),
+  // The Work_Image's long side is at most 1024 px (Requirement 1.3; the pad is 1024 × 768). A larger img would make
+  // every Viewer allocate it, and a cut-out canvas up to its size per Instance.
+  img: z.object({ w: z.number().int().min(1).max(MAX_IMG_SIDE), h: z.number().int().min(1).max(MAX_IMG_SIDE) }),
   ground: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   backdrop: z.enum(["image", "gradient"]),
   instances: z.array(SavedInstance).max(MAX_SAVED_INSTANCES)

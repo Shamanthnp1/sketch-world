@@ -106,6 +106,8 @@ it.each<[string, number, () => Record<string, string | File>]>([
   ["a 31st cut PNG for no Instance", 400, () => ({ ...fields(scene()), "cut/30.png": new File([png], "30.png") })],
   ["a missing cut PNG", 400, () => { const { "cut/2.png": _, ...rest } = fields(scene()); return rest; }],
   ["a PNG thumb", 415, () => ({ ...fields(scene()), "thumb.jpg": new File([png], "t.png") })],
+  // Every Viewer would allocate a 4096 × 4096 Work_Image and a canvas up to that size per cut-out.
+  ["an img larger than the 1024 px Work_Image", 400, () => fields(scene({ img: { w: 4096, h: 4096 } }))],
 ])("refuses %s with %i and writes nothing", async (_, status, f) => {
   const before = await stored();
 

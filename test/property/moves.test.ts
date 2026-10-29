@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { Moves, MovesBody, SavedScene, movesValid, type SavedInstance } from "../../shared/saved";
+import { MAX_IMG_SIDE, Moves, MovesBody, SavedScene, movesValid, type SavedInstance } from "../../shared/saved";
 import { ALL_TYPES, group, type ObjType } from "../../shared/scene";
 import { WORLD_BOUNDS as B } from "../../src/world/collide";
 import { clampKind } from "../../src/world/drag";
@@ -41,7 +41,7 @@ const instancesArb = (img: Size) => fc.tuple(
 const movable = (s: Pick<SavedScene, "instances">) => s.instances.filter((o) => placement(o) !== "terrain");
 
 // A valid SavedScene: some (or all) non-terrain Instances moved, each to a point clamped into the bounds for its kind.
-const sceneArb: fc.Arbitrary<Scene> = fc.record({ w: fc.integer({ min: 1, max: 4096 }), h: fc.integer({ min: 1, max: 4096 }) })
+const sceneArb: fc.Arbitrary<Scene> = fc.record({ w: fc.integer({ min: 1, max: MAX_IMG_SIDE }), h: fc.integer({ min: 1, max: MAX_IMG_SIDE }) })
   .chain((img) => fc.record({
     v: fc.constant(1 as const),
     title: fc.constantFrom("My town", "Château d'eau, 2!"),

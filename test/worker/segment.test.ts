@@ -1,10 +1,14 @@
 /// <reference types="vite/client" />
-// POST /api/segment through the router, with the outbound SAM call mocked (no live API calls).
-import { exports } from "cloudflare:workers";
+// POST /api/segment through the router, with the outbound SAM call mocked (no live API calls). The drawing has the
+// safe Checks_Row that /api/understand would write (seeded in beforeEach; understand.test.ts covers that write).
+import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from "vitest";
 import drawing from "../fixtures/images/line-drawing.png?inline";    // 512×384
 import sam from "../fixtures/meta/smoke-sam.json";    // SAM's real reply for the noun "house" on that drawing
+import { utcDay } from "../../worker/cost";
+import { sha256Hex } from "../../worker/crypto";
 import { MAX_IMAGE_BYTES } from "../../worker/limits/input";
+import { NOT_CHECKED } from "../../worker/routes/understand";
 
 // Set in vitest.config.ts. Compared as booleans, so a failed check never prints a key.
 const KEY = "test-only-model-api-key";
@@ -35,9 +39,14 @@ const samBody = (text: string) => ({
   }],
 });
 
+const setCheck = async (bytes: Uint8Array, safe: number) =>
+  env.DB.prepare("INSERT OR REPLACE INTO checks (sha256, safe, created_at) VALUES (?1, ?2, ?3)").bind(await sha256Hex(bytes), safe, Date.now()).run();
+const spentToday = () => env.DB.prepare("SELECT spent_micro FROM usage WHERE day = ?1").bind(utcDay(Date.now())).first<number>("spent_micro");
+
 let consoleSpies: MockInstance[] = [];
 const logged = () => consoleSpies.flatMap((s) => s.mock.calls.flat().map(String)).join("\n");
-beforeEach(() => {
+beforeEach(async () => {
+  await setCheck(drawingBytes, 1);
   consoleSpies = [vi.spyOn(console, "log"), vi.spyOn(console, "error")].map((s) => s.mockImplementation(() => {}));
 });
 afterEach(() => vi.restoreAllMocks());
@@ -95,6 +104,25 @@ it.each<[string, number, string, BodyInit]>([
   expect(res.status).toBe(status);
   expect(await res.json()).toEqual({ error });
   expect(fetch).not.toHaveBeenCalled();
+});
+
+// One byte more than the checked drawing: a different SHA-256, as for any picture that never went through understand.
+const unchecked = new Uint8Array([...drawingBytes, 0]), unsafe = new Uint8Array([...drawingBytes, 1]);
+it.each<[string, Uint8Array, Record<string, string>]>([
+  ["an image /api/understand never checked", unchecked, { noun: "house" }],
+  ["an image whose Checks_Row has safe = 0", unsafe, { box }],
+])("refuses %s with 403, no reservation and no SAM call (Requirement 12.9)", async (_, bytes, prompt) => {
+  await setCheck(unsafe, 0);
+  const fetch = vi.spyOn(globalThis, "fetch");
+  const before = await spentToday();
+
+  const res = await segment(form({ image: png(bytes), ...prompt }));
+
+  expect(res.status).toBe(403);
+  expect(await res.json()).toEqual({ error: NOT_CHECKED });
+  expect(NOT_CHECKED).toBe("Only drawings checked by this app can be cut out");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(await spentToday()).toBe(before);
 });
 
 it("returns 502 {error} after three 500s from SAM", async () => {

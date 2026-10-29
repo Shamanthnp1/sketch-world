@@ -1,10 +1,14 @@
 /// <reference types="vite/client" />
-// POST /api/point through the router, with the outbound Spark call mocked (no live API calls).
-import { exports } from "cloudflare:workers";
+// POST /api/point through the router, with the outbound Spark call mocked (no live API calls). The drawing has the
+// safe Checks_Row that /api/understand would write (seeded in beforeEach; understand.test.ts covers that write).
+import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from "vitest";
 import drawing from "../fixtures/images/line-drawing.png?inline";    // 512×384: house, tree, sun
 import fixture from "../fixtures/meta/point-line-drawing.json";    // hand-built Spark reply with one box per object
+import { utcDay } from "../../worker/cost";
+import { sha256Hex } from "../../worker/crypto";
 import { POINT_INSTRUCTIONS, SPARK_BOXES_JSON_SCHEMA } from "../../worker/meta/spark";
+import { NOT_CHECKED } from "../../worker/routes/understand";
 
 // Set in vitest.config.ts. Compared as booleans, so a failed check never prints a key.
 const KEY = "test-only-model-api-key";
@@ -39,9 +43,14 @@ function spark(...texts: string[]) {
   return fetch;
 }
 
+const setCheck = async (bytes: Uint8Array, safe: number) =>
+  env.DB.prepare("INSERT OR REPLACE INTO checks (sha256, safe, created_at) VALUES (?1, ?2, ?3)").bind(await sha256Hex(bytes), safe, Date.now()).run();
+const spentToday = () => env.DB.prepare("SELECT spent_micro FROM usage WHERE day = ?1").bind(utcDay(Date.now())).first<number>("spent_micro");
+
 let consoleSpies: MockInstance[] = [];
 const logged = () => consoleSpies.flatMap((s) => s.mock.calls.flat().map(String)).join("\n");
-beforeEach(() => {
+beforeEach(async () => {
+  await setCheck(drawingBytes, 1);
   consoleSpies = [vi.spyOn(console, "log"), vi.spyOn(console, "error")].map((s) => s.mockImplementation(() => {}));
 });
 afterEach(() => vi.restoreAllMocks());
@@ -166,6 +175,24 @@ it("replies 502 after three 500s from Spark, with no route retry", async () => {
   expect(fetch).toHaveBeenCalledTimes(3);
   expect(text.includes(KEY)).toBe(false);
   expect(logged().includes(KEY)).toBe(false);
+});
+
+// One byte more than the checked drawing: a different SHA-256, as for any picture that never went through understand.
+const unchecked = new Uint8Array([...drawingBytes, 0]), unsafe = new Uint8Array([...drawingBytes, 1]);
+it.each<[string, Uint8Array]>([
+  ["an image /api/understand never checked", unchecked],
+  ["an image whose Checks_Row has safe = 0", unsafe],
+])("refuses %s with 403, no reservation and no Spark call (Requirement 12.9)", async (_, bytes) => {
+  await setCheck(unsafe, 0);
+  const fetch = vi.spyOn(globalThis, "fetch");
+  const before = await spentToday();
+
+  const res = await point(form({ image: png(bytes), objects: JSON.stringify(OBJECTS) }));
+
+  expect(res.status).toBe(403);
+  expect(await res.json()).toEqual({ error: NOT_CHECKED });
+  expect(fetch).not.toHaveBeenCalled();
+  expect(await spentToday()).toBe(before);
 });
 
 const thirteen = Array.from({ length: 13 }, () => OBJECTS[0]);

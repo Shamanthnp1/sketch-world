@@ -7,6 +7,7 @@ import boxes from "../fixtures/meta/point-line-drawing.json";      // hand-built
 import sam from "../fixtures/meta/smoke-sam.json";                  // SAM's real reply for "house"
 import scene from "../fixtures/meta/understand-line-drawing.json";  // Spark's real scene reply
 import { CAP_REACHED, capMicro, COST_MICRO, reserve, reserveCall, utcDay, type CostKind } from "../../worker/cost";
+import { sha256Hex } from "../../worker/crypto";
 import { png } from "./helpers";
 
 // Every test here runs on its own UTC day in 2001, so its usage row is not the one other tests reserve on.
@@ -17,7 +18,8 @@ const seed = (day: string, micro: number) => env.DB.prepare("INSERT INTO usage (
 const spent = (day: string) => env.DB.prepare("SELECT spent_micro FROM usage WHERE day = ?1").bind(day).first<number>("spent_micro");
 
 // Trailing bytes give this file's understand calls their own checks row (the hash differs from understand.test.ts's).
-const drawing = () => new File([new Uint8Array([...png, 0x63, 0x6f, 0x73, 0x74])], "drawing.png");
+const drawingBytes = new Uint8Array([...png, 0x63, 0x6f, 0x73, 0x74]);
+const drawing = () => new File([drawingBytes], "drawing.png");
 const multipart = (fields: Record<string, string | File>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(fields)) f.append(k, v);
@@ -36,6 +38,8 @@ const ROUTES: [string, CostKind, () => BodyInit, unknown][] = [
 let consoleSpies: MockInstance[] = [];
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM usage WHERE day LIKE '2001-%'").run();
+  // The safe Checks_Row /api/understand writes for the drawing, so point and segment pass their safe gate (12.9).
+  await env.DB.prepare("INSERT OR REPLACE INTO checks (sha256, safe, created_at) VALUES (?1, 1, ?2)").bind(await sha256Hex(drawingBytes), Date.now()).run();
   consoleSpies = [vi.spyOn(console, "log"), vi.spyOn(console, "warn")].map((s) => s.mockImplementation(() => {}));
 });
 afterEach(() => vi.restoreAllMocks());

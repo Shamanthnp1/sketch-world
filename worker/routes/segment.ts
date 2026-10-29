@@ -1,5 +1,5 @@
-// POST /api/segment: one sam-3.1 call on the Work_Image (Requirements 4.1, 4.2, 11.7, 12.5).
-// Multipart: `image` (JPEG or PNG, ≤ 400 KB) and exactly one prompt: `noun` (a scene noun) or
+// POST /api/segment: one sam-3.1 call on the Work_Image (Requirements 4.1, 4.2, 11.7, 12.5, 12.9).
+// Multipart: `image` (JPEG or PNG, ≤ 400 KB, with a safe Checks_Row) and exactly one prompt: `noun` (a scene noun) or
 // `box` (PxBox JSON in the image's pixel coordinates, from /api/point).
 import { buildObjectPrompt } from "@meta-sam/parser";
 import { reserveCall } from "../cost";
@@ -8,6 +8,7 @@ import { imageInfo, type ImageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readBox, readForm, readImage, readNoun } from "../limits/input";
 import { metaFetch } from "../meta/metaFetch";
 import { base64, outputText } from "../meta/reply";
+import { checkedSafe, NOT_CHECKED } from "./understand";
 
 // The image plus the prompt field and multipart framing; a larger body is refused before parsing.
 const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 16 * 1024;
@@ -23,6 +24,8 @@ export async function segment(req: Request, env: Env): Promise<Response> {
   if (!info) return jsonError(415, "image size could not be read from its header");
   const text = promptText(form, info);
   if (text instanceof Response) return text;
+  // Only a drawing /api/understand found safe (Requirement 12.9): no reservation and no SAM call otherwise.
+  if (!(await checkedSafe(env, bytes))) return jsonError(403, NOT_CHECKED);
 
   // Reserve the SAM estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no SAM call.
   const refused = await reserveCall(env, "sam");

@@ -44,6 +44,18 @@ export async function understand(req: Request, env: Env): Promise<Response> {
   return safe ? Response.json(scene) : jsonError(422, NOT_A_DRAWING);
 }
 
+export const NOT_CHECKED = "Only drawings checked by this app can be cut out";
+
+/**
+ * True if the Checks_Row above says these exact bytes are a safe drawing. /api/segment and /api/point ask this after
+ * their input caps and before reserveCall (Requirement 12.9), so the refusal of 3.9 holds on every model route; the
+ * browser sends them the same Work_Image JPEG it sent here.
+ */
+export async function checkedSafe(env: Pick<Env, "DB">, bytes: Uint8Array): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT safe FROM checks WHERE sha256 = ?1").bind(await sha256Hex(bytes)).first<{ safe: number }>();
+  return row?.safe === 1;
+}
+
 // Not JSON → undefined, which then fails the schema like any other bad reply.
 function parseJson(text: string): unknown {
   try {

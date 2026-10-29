@@ -32,15 +32,24 @@ async function storedWorld() {
   return { id, token };
 }
 
+/** The safe Checks_Row /api/understand would write for `bytes`, which point, segment and save need. */
+const checked = async (bytes: Uint8Array) =>
+  env.DB.prepare("INSERT OR REPLACE INTO checks (sha256, safe, created_at) VALUES (?1, 1, ?2)").bind(await sha256Hex(bytes), Date.now()).run();
+
 // Every limited route with a request its handler would accept (Meta call, D1 or R2 write) if it ran.
 const LIMITED: [string, LimitedRoute, (headers: Record<string, string>) => Promise<Request>][] = [
   ["POST /api/understand", "understand", async (h) => req("POST", "/api/understand", form({ image: png }), h)],
-  ["POST /api/point", "point", async (h) =>
-    req("POST", "/api/point", form({ image: png, objects: JSON.stringify([{ type: "house", noun: "house", count: 1 }]) }), h)],
-  ["POST /api/segment", "segment", async (h) => req("POST", "/api/segment", form({ image: png, noun: "house" }), h)],
+  ["POST /api/point", "point", async (h) => {
+    await checked(png);
+    return req("POST", "/api/point", form({ image: png, objects: JSON.stringify([{ type: "house", noun: "house", count: 1 }]) }), h);
+  }],
+  ["POST /api/segment", "segment", async (h) => {
+    await checked(png);
+    return req("POST", "/api/segment", form({ image: png, noun: "house" }), h);
+  }],
   ["POST /api/backdrop", "backdrop", async (h) => req("POST", "/api/backdrop", JSON.stringify({ title: "Rate town", style: "sketch" }), h)],
   ["POST /api/worlds", "save", async (h) => {
-    await env.DB.prepare("INSERT OR REPLACE INTO checks (sha256, safe, created_at) VALUES (?1, 1, ?2)").bind(await sha256Hex(jpg), Date.now()).run();
+    await checked(jpg);
     return req("POST", "/api/worlds",
       form({ scene: JSON.stringify(scene), "source.jpg": jpg, "thumb.jpg": jpg, "backdrop.jpg": jpg, "cut/0.png": png }), h);
   }],

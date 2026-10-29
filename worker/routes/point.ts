@@ -1,5 +1,5 @@
-// POST /api/point: Spark boxes for the scene objects SAM missed by name (Requirements 5.1, 5.2, 11.7, 12.2).
-// Multipart: `image` (JPEG or PNG, ≤ 400 KB) and `objects` (JSON [{type, noun, count}], 1–12 entries).
+// POST /api/point: Spark boxes for the scene objects SAM missed by name (Requirements 5.1, 5.2, 11.7, 12.2, 12.9).
+// Multipart: `image` (JPEG or PNG, ≤ 400 KB, with a safe Checks_Row) and `objects` (JSON [{type, noun, count}], 1–12 entries).
 // The browser sends no prompt text. Reply: {boxes: [{objIndex, box: {x0, y0, x1, y1}}]} on Spark's 0–1000 grid,
 // at most `count` boxes per object, in Spark's order; the browser scales them to pixels.
 import { reserveCall } from "../cost";
@@ -7,6 +7,7 @@ import { jsonError } from "../http";
 import { imageInfo } from "../limits/imageSize";
 import { MAX_IMAGE_BYTES, readForm, readImage, readJsonField } from "../limits/input";
 import { askPoint, PointObjects, SparkBoxes } from "../meta/spark";
+import { checkedSafe, NOT_CHECKED } from "./understand";
 
 // The image, the objects field and multipart framing; a larger body is refused before parsing.
 const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 16 * 1024;
@@ -26,6 +27,8 @@ export async function point(req: Request, env: Env): Promise<Response> {
   const bytes = new Uint8Array(await image.arrayBuffer());
   const info = imageInfo(bytes);
   if (!info) return jsonError(415, "image size could not be read from its header");
+  // Only a drawing /api/understand found safe (Requirement 12.9): no reservation and no Spark call otherwise.
+  if (!(await checkedSafe(env, bytes))) return jsonError(403, NOT_CHECKED);
 
   let reply: SparkBoxes | undefined;
   for (let attempt = 1; attempt <= ATTEMPTS && !reply; attempt++) {

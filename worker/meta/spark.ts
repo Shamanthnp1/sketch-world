@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { ALL_TYPES, NOUN, SPARK_SCENE_JSON_SCHEMA } from "../../shared/scene";
 import type { ImageInfo } from "../limits/imageSize";
-import { metaFetch } from "./metaFetch";
+import { metaFetch, type MetaCall } from "./metaFetch";
 import { base64, outputText } from "./reply";
 
 // The allowed types come from the JSON schema's enum, so they are not repeated here.
@@ -41,9 +41,9 @@ export function sceneBody(image: Uint8Array, type: ImageInfo["type"]): Record<st
   };
 }
 
-// One Spark scene call. Returns the reply text, not yet validated.
-export async function askScene(env: Pick<Env, "MODEL_API_KEY">, image: Uint8Array, type: ImageInfo["type"]): Promise<string> {
-  const res = await metaFetch(env, { route: "understand", model: "muse-spark-1.3", path: "/responses", body: sceneBody(image, type) });
+// One Spark scene call. Returns the reply text, not yet validated. `reserveAgain`: see MetaCall.
+export async function askScene(env: Pick<Env, "MODEL_API_KEY">, image: Uint8Array, type: ImageInfo["type"], reserveAgain?: MetaCall["reserveAgain"]): Promise<string> {
+  const res = await metaFetch(env, { route: "understand", model: "muse-spark-1.3", path: "/responses", body: sceneBody(image, type), reserveAgain });
   return outputText(res);
 }
 
@@ -104,8 +104,10 @@ export function pointBody(image: Uint8Array, type: ImageInfo["type"], objects: P
   };
 }
 
-// One Spark point call. Returns the reply text, not yet validated.
-export async function askPoint(env: Pick<Env, "MODEL_API_KEY">, image: Uint8Array, type: ImageInfo["type"], objects: PointObjects): Promise<string> {
-  const res = await metaFetch(env, { route: "point", model: "muse-spark-1.3", path: "/responses", body: pointBody(image, type, objects) });
+// One Spark point call. Returns the reply text, not yet validated. `reserveAgain`: see MetaCall.
+export async function askPoint(
+  env: Pick<Env, "MODEL_API_KEY">, image: Uint8Array, type: ImageInfo["type"], objects: PointObjects, reserveAgain?: MetaCall["reserveAgain"],
+): Promise<string> {
+  const res = await metaFetch(env, { route: "point", model: "muse-spark-1.3", path: "/responses", body: pointBody(image, type, objects), reserveAgain });
   return outputText(res);
 }

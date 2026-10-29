@@ -31,12 +31,14 @@ export async function point(req: Request, env: Env): Promise<Response> {
   if (!(await checkedSafe(env, bytes))) return jsonError(403, NOT_CHECKED);
 
   let reply: SparkBoxes | undefined;
+  const reserveSpark = () => reserveCall(env, "spark", req);
   for (let attempt = 1; attempt <= ATTEMPTS && !reply; attempt++) {
-    // Each attempt reserves the Spark estimate first (Requirement 11.5); refused → the 503 {mode: "sample"}
-    // with no Spark call. A MetaApiError propagates (router → 502).
-    const refused = await reserveCall(env, "spark", req);
+    // Each attempt reserves the Spark estimate first (Requirement 11.5), and so does metaFetch's retry after a
+    // timeout (reserveAgain); refused → the 503 {mode: "sample"} with no Spark call. A MetaApiError propagates
+    // (router → 502).
+    const refused = await reserveSpark();
     if (refused) return refused;
-    const parsed = SparkBoxes.safeParse(parseJson(await askPoint(env, bytes, info.type, objects.data)));
+    const parsed = SparkBoxes.safeParse(parseJson(await askPoint(env, bytes, info.type, objects.data, reserveSpark)));
     if (parsed.success) reply = parsed.data;
     // Field paths only, never values: the reply describes the user's drawing.
     else console.log(JSON.stringify({ route: "point", attempt, invalid: parsed.error.issues.map((i) => i.path.join(".")) }));

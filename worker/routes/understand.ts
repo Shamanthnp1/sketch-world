@@ -24,12 +24,14 @@ export async function understand(req: Request, env: Env): Promise<Response> {
   if (!info) return jsonError(415, "image size could not be read from its header");
 
   let scene: SparkScene | undefined;
+  const reserveSpark = () => reserveCall(env, "spark", req);
   for (let attempt = 1; attempt <= ATTEMPTS && !scene; attempt++) {
-    // Each attempt reserves the Spark estimate first, so the retry reserves again (Requirements 3.6, 11.5).
-    // Refused → the 503 {mode: "sample"} with no Spark call. A MetaApiError propagates (router → 502).
-    const refused = await reserveCall(env, "spark", req);
+    // Each attempt reserves the Spark estimate first, so the retry reserves again (Requirements 3.6, 11.5), and so
+    // does metaFetch's retry after a timeout (reserveAgain). Refused → the 503 {mode: "sample"} with no Spark call.
+    // A MetaApiError propagates (router → 502).
+    const refused = await reserveSpark();
     if (refused) return refused;
-    const parsed = SparkScene.safeParse(parseJson(await askScene(env, bytes, info.type)));
+    const parsed = SparkScene.safeParse(parseJson(await askScene(env, bytes, info.type, reserveSpark)));
     if (parsed.success) scene = parsed.data;
     // Field paths only, never values: the reply describes the user's drawing.
     else console.log(JSON.stringify({ route: "understand", attempt, invalid: parsed.error.issues.map((i) => i.path.join(".")) }));

@@ -1,4 +1,5 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { EarlyReply } from "../../worker/http";
 import { MetaApiError, metaFetch, type MetaCall } from "../../worker/meta/metaFetch";
 
 const KEY = "sk-test-secret-key";
@@ -125,6 +126,47 @@ it("times out each attempt at 30 s by default, or at the call's timeoutMs", asyn
 
   expect(timeout.mock.calls).toEqual([[30_000], [90_000]]);
   expect(JSON.parse(String(fetch.mock.calls[1]![1].body))).toEqual({ input: "secret prompt", model: "muse-image-1.0" });    // not sent
+});
+
+describe("reserveAgain (docs/review.md finding 9)", () => {
+  const timeout = () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); };
+
+  it("is asked before each retry after a timeout or a network error", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const { deps, waits } = transport(timeout, () => { throw new TypeError("Network connection lost"); }, () => Response.json({}));
+    const reserveAgain = vi.fn(async () => null);
+
+    const res = await metaFetch(env, { ...call, reserveAgain }, deps);
+
+    expect(res.status).toBe(200);
+    expect(deps.fetch).toHaveBeenCalledTimes(3);
+    expect(reserveAgain).toHaveBeenCalledTimes(2);    // with the route's own reservation, 3 for 3 attempts
+    expect(waits).toEqual([250, 500]);
+  });
+
+  it("stops without a retry and throws EarlyReply with the refusal when the re-reservation is refused", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const { deps, waits } = transport(timeout, () => Response.json({}));
+    const refusal = Response.json({ mode: "sample", reason: "daily", error: "used up" }, { status: 503 });
+    const reserveAgain = vi.fn(async () => refusal);
+
+    const err = await metaFetch(env, { ...call, reserveAgain }, deps).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(EarlyReply);
+    expect((err as EarlyReply).reply).toBe(refusal);
+    expect(deps.fetch).toHaveBeenCalledTimes(1);
+    expect(waits).toEqual([]);
+  });
+
+  it("is not asked when a 429 or 5xx reply is retried", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const { deps } = transport(() => new Response(null, { status: 429 }), () => new Response(null, { status: 503 }), () => Response.json({}));
+    const reserveAgain = vi.fn(async () => null);
+
+    expect((await metaFetch(env, { ...call, reserveAgain }, deps)).status).toBe(200);
+    expect(deps.fetch).toHaveBeenCalledTimes(3);
+    expect(reserveAgain).not.toHaveBeenCalled();
+  });
 });
 
 // The router's MetaApiError → 502/422 mapping is tested with the routes that call metaFetch (2.4, 8.1).

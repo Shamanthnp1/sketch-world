@@ -2,7 +2,7 @@
 // style enum value (Requirements 9.2, 9.3, 9.4, 12.2).
 import { z } from "zod";
 import { SparkSceneBase } from "../../shared/scene";
-import { MetaApiError, metaFetch } from "./metaFetch";
+import { MetaApiError, metaFetch, type MetaCall } from "./metaFetch";
 
 export const BACKDROP_STYLES = ["sketch"] as const;
 export type BackdropStyle = (typeof BACKDROP_STYLES)[number];
@@ -44,9 +44,13 @@ export const backdropBody = (style: BackdropStyle, title: string): Record<string
 });
 
 // One Muse Image call. Returns the PNG bytes from the image_generation_call item.
-// A reply without a PNG throws MetaApiError, the same 502 as a failed call.
-export async function askBackdrop(env: Pick<Env, "MODEL_API_KEY">, style: BackdropStyle, title: string): Promise<Uint8Array<ArrayBuffer>> {
-  const res = await metaFetch(env, { route: "backdrop", model: "muse-image-1.0", path: "/responses", body: backdropBody(style, title), timeoutMs: BACKDROP_TIMEOUT_MS });
+// A reply without a PNG throws MetaApiError, the same 502 as a failed call. `reserveAgain`: see MetaCall.
+export async function askBackdrop(
+  env: Pick<Env, "MODEL_API_KEY">, style: BackdropStyle, title: string, reserveAgain?: MetaCall["reserveAgain"],
+): Promise<Uint8Array<ArrayBuffer>> {
+  const res = await metaFetch(env, {
+    route: "backdrop", model: "muse-image-1.0", path: "/responses", body: backdropBody(style, title), timeoutMs: BACKDROP_TIMEOUT_MS, reserveAgain,
+  });
   const reply = ImageReply.safeParse(await res.json().catch(() => null));
   const result = reply.success ? reply.data.output.find((o) => o.type === "image_generation_call" && o.result)?.result : null;
   const png = result ? fromBase64(result) : null;

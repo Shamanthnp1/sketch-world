@@ -48,6 +48,7 @@ const ROUTES: [string, CostKind, () => BodyInit, unknown][] = [
 ];
 /** ROUTES with a day of `month` in 2001 each. */
 const onDays = (month: string) => ROUTES.map(([path, kind, body, reply], i) => [path, kind, body, reply, `2001-${month}-0${i + 1}`] as const);
+const timeout = () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); };
 
 let consoleSpies: MockInstance[] = [];
 beforeEach(async () => {
@@ -130,9 +131,56 @@ it("keeps the reservation when the model call fails (Requirement 11.5)", async (
   const res = await post("/api/segment", multipart({ image: drawing(), noun: "house" }));
 
   expect(res.status).toBe(502);
-  expect(fetch).toHaveBeenCalledTimes(3);    // metaFetch's own retries are one model call and one reservation
+  expect(fetch).toHaveBeenCalledTimes(3);    // 5xx retries are one model call and one reservation
   expect(await spent("2001-03-01")).toBe(COST_MICRO.sam);
   expect(await spentBy("2001-03-01", IP)).toBe(COST_MICRO.sam);
+});
+
+it.each(onDays("08"))(
+  "%s reserves its %s estimate again before retrying a timed-out call (a timeout, then success: 2 reservations)",
+  async (path, kind, body, reply, day) => {
+    onDay(day);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementationOnce(async () => timeout()).mockImplementation(async () => Response.json(reply));
+
+    const res = await post(path, body());
+
+    expect(res.status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(await spent(day)).toBe(2 * COST_MICRO[kind]);
+    expect(await spentBy(day, IP)).toBe(2 * COST_MICRO[kind]);
+  },
+);
+
+it.each(onDays("09"))(
+  "%s replies 503 {mode: 'sample'} with no second Meta call when the re-reservation after a timeout is refused",
+  async (path, kind, body, _, day) => {
+    onDay(day);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    await seedClient(day, IP, CLIENT_CAP - COST_MICRO[kind]);    // room for the first attempt only
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => timeout());
+
+    const res = await post(path, body());
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ mode: "sample", reason: "visitor", error: CLIENT_CAP_REACHED });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await spent(day)).toBe(COST_MICRO[kind]);
+    expect(await spentBy(day, IP)).toBe(CLIENT_CAP);
+  },
+);
+
+it("keeps one reservation when a 503 reply is retried (a 503, then success)", async () => {
+  onDay("2001-03-02");
+  vi.spyOn(Math, "random").mockReturnValue(0);
+  const fetch = vi.spyOn(globalThis, "fetch")
+    .mockImplementationOnce(async () => new Response("busy", { status: 503 })).mockImplementation(async () => Response.json(sam));
+
+  const res = await post("/api/segment", multipart({ image: drawing(), noun: "house" }));
+
+  expect(res.status).toBe(200);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(await spent("2001-03-02")).toBe(COST_MICRO.sam);
 });
 
 it("refuses a reservation that would pass the Daily_Cap and leaves both totals unchanged", async () => {

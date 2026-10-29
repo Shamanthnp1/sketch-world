@@ -1,4 +1,4 @@
-import { jsonError } from "./http";
+import { EarlyReply, jsonError } from "./http";
 import { rateLimit, type LimitedRoute } from "./limits/rate";
 import { asset } from "./routes/assets";
 import { backdrop } from "./routes/backdrop";
@@ -56,6 +56,8 @@ export default {
         if (refused) return refused;
         return await r.handler(req, env, ctx, match.pathname.groups);
       } catch (err) {
+        // metaFetch's retry after a timeout was refused its reservation: its 503 {mode: "sample"}.
+        if (err instanceof EarlyReply) return err.reply;
         // Matched by name so the router doesn't depend on worker/meta/metaFetch.ts.
         if (err instanceof Error && err.name === "MetaApiError") return jsonError(502, "The model service failed. Please retry.");
         // Name only, never the message: it could echo request data.

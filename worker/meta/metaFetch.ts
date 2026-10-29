@@ -1,4 +1,6 @@
 // The only path from the Worker to the Meta Model API.
+import { EarlyReply } from "../http";
+
 const BASE_URL = "https://api.meta.ai/v1";
 const ATTEMPTS = 3;
 const BACKOFF_BASE_MS = 500;
@@ -15,6 +17,10 @@ export interface MetaCall {
   path: `/${string}`;               // e.g. "/responses"
   body: Record<string, unknown>;    // JSON body; metaFetch sets `model`
   timeoutMs?: number;               // per attempt; default TIMEOUT_MS
+  // The route's reservation for one more call (reserveCall), asked before a retry after a timeout or network error:
+  // Meta may have run, and billed, that attempt. null: reserved. A Response (the 503 {mode: "sample"}): refused, so
+  // metaFetch stops and throws EarlyReply(it), which the router sends. Without it, every retry uses one reservation.
+  reserveAgain?: () => Promise<Response | null>;
 }
 
 // Injectable for tests; defaults are the real platform functions.
@@ -65,6 +71,11 @@ export async function metaFetch(env: Pick<Env, "MODEL_API_KEY">, call: MetaCall,
     // Retry-After beyond the cap: fail now rather than hold the request.
     if (!retryable || attempt === ATTEMPTS || waitMs > BACKOFF_CAP_MS) throw new MetaApiError(status, res ? await errorCode(res) : null);
     await res?.body?.cancel();
+    // No reply: the request may have reached Meta (fetch doesn't say whether a network error came before or after
+    // sending), so the retry may be one more billed call. A 429 or 5xx reply is probably not billed: its retry keeps the
+    // one reservation.
+    const refused = !res && call.reserveAgain ? await call.reserveAgain() : null;
+    if (refused) throw new EarlyReply(refused);
     await sleep(waitMs);
   }
 }

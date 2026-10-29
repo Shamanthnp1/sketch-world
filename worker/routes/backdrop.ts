@@ -19,11 +19,13 @@ export async function backdrop(req: Request, env: Env): Promise<Response> {
   if (!body.success) return jsonError(400, BAD_BODY);
 
   // Reserve the Muse Image estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no call.
-  const refused = await reserveCall(env, "image", req);
+  // A retry after a timeout reserves again (reserveAgain).
+  const reserveImage = () => reserveCall(env, "image", req);
+  const refused = await reserveImage();
   if (refused) return refused;
   let png: Uint8Array<ArrayBuffer>;
   try {
-    png = await askBackdrop(env, body.data.style, body.data.title);
+    png = await askBackdrop(env, body.data.style, body.data.title, reserveImage);
   } catch (err) {
     // Any other MetaApiError propagates (router → 502).
     if (err instanceof MetaApiError && err.code === "content_policy_violation") return jsonError(422, POLICY_REFUSED);

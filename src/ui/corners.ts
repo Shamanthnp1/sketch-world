@@ -1,5 +1,5 @@
 // Adapted from undo-manual (same author, built during the event).
-// Corner clicks (Requirements 1.1, 1.2, 1.6). Shows the paper photo, takes 4 taps (the paper's top-left corner as
+// Corner clicks (Requirements 1.1, 1.2, 1.6, 1.7). Shows the paper photo, takes 4 taps (the paper's top-left corner as
 // seen in the photo, then clockwise) as numbered markers, checks them and resolves with the corners in photo px.
 // Taps arrive as `click`, which browsers fire for mouse, pen and touch taps but not for pans or pinch-zooms, so a
 // phone user can zoom in to place a corner. Nothing here touches the network: the raw photo stays in the browser.
@@ -10,6 +10,11 @@ type Rect = { left: number; top: number; width: number; height: number };
 type Check = { ok: true } | { ok: false; reason: string };
 
 const AREA_PCT = [15, 80] as const; // requirements.md Notes: the copied area check, % of the photo
+// Use the whole photo (Requirement 1.7): a screenshot or drawing-app image may have any shape up to 4 : 1 (32:9 screens
+// are 3.56 : 1), so the Work_Image's short side stays ≥ 256 px once the long side is cut to 1024; and ≥ 64 px a side,
+// since the Work_Image is never upscaled and Spark and SAM need pixels to read.
+const WHOLE_MAX_ASPECT = 4;
+const WHOLE_MIN_PX = 64;
 const SHOW_MAX = 2048;               // long side of the on-screen copy; taps map to the full photo
 const STEPS = [
   "Tap the paper’s top-left corner.",
@@ -28,6 +33,24 @@ export function toPhotoPx(clientX: number, clientY: number, r: Rect, w: number, 
 /** The photo's own corners in the same order, for a photo that shows only the paper. */
 export function wholePhoto(w: number, h: number): Quad {
   return [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }];
+}
+
+/**
+ * Use the whole photo on a w × h picture: any aspect up to 4 : 1 either way and at least 64 px a side. The paper shape
+ * and area checks of checkCorners are for tapped corners only: a whole picture is the drawing itself, not a paper sheet.
+ */
+export function checkWhole(w: number, h: number): Check {
+  const short = Math.min(w, h), aspect = Math.max(w, h) / short;
+  if (short < WHOLE_MIN_PX) {
+    return { ok: false, reason: `Too small: the picture is ${w} × ${h} px (needs at least ${WHOLE_MIN_PX} px on each side). Try a larger picture.` };
+  }
+  if (aspect > WHOLE_MAX_ASPECT) {
+    return {
+      ok: false,
+      reason: `Too ${w > h ? "wide" : "tall"}: the picture is ${aspect.toFixed(2)} : 1 (the whole picture can be up to ${WHOLE_MAX_ASPECT} : 1). Tap the corners of the part you want instead.`,
+    };
+  }
+  return { ok: true };
 }
 
 /** Tapped corners: validateQuad (convex, clockwise, aspect 1.0–1.8), then an area of 15–80% of the w × h photo. */
@@ -132,11 +155,12 @@ export function pickCorners(host: HTMLElement, photo: ImageBitmap | HTMLImageEle
     const finish = (q: Quad | null) => { root.remove(); resolve(q); };
     use.addEventListener("click", () => finish(pts.slice() as Quad));
     button("cancel").addEventListener("click", () => finish(null));
-    // The keyboard path: no tapping needed. Only the shape check applies, since the whole photo is 100% of itself.
+    // The keyboard path: no tapping needed. A screenshot or an MS Paint image is the drawing itself and may be wide
+    // (the gate's ms1.png is 2.82 : 1), so only checkWhole's limits apply, not the paper sheet's shape and area.
     button("whole").addEventListener("click", () => {
-      const q = wholePhoto(w, h), r = validateQuad(q);
-      if (r.ok) finish(q);
-      else showError(`${r.reason} Tap the paper’s corners instead.`);
+      const r = checkWhole(w, h);
+      if (r.ok) finish(wholePhoto(w, h));
+      else showError(r.reason);
     });
   });
 }

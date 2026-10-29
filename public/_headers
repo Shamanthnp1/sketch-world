@@ -1,6 +1,7 @@
 # Workers Static Assets apply these to asset responses only (Requirement 12.7); /api/* and /a/* run the Worker first.
+# frame-ancestors 'none' (not in default-src's fallback): no other site can frame the app and trick a click on Delete world.
 /*
-  Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'
+  Content-Security-Policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
 # The licence copies are UTF-8 (curly quotes); without a charset, browsers decode text/plain as windows-1252.
 /licenses/*

@@ -76,5 +76,8 @@ export interface WorldReply {
 
 /** One world in GET /api/gallery; a superset of the Home strip's GalleryItem {id, title, thumb}. */
 export interface GalleryWorld { id: string; title: string; thumb: string; createdAt: number }
-/** `worlds`: the 24 latest safe worlds, newest first. `samples`: the SAMPLE_WORLD_IDS worlds that exist, in that order. */
+/**
+ * `worlds`: the 24 latest approved worlds (safe, and listed by the operator or a sample), newest first.
+ * `samples`: the SAMPLE_WORLD_IDS worlds that exist, in that order.
+ */
 export interface GalleryReply { worlds: GalleryWorld[]; samples: GalleryWorld[] }

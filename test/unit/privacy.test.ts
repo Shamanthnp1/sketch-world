@@ -27,11 +27,13 @@ describe("privacy acceptance storage", () => {
 });
 
 describe("privacy notice text (Requirement 12.1)", () => {
-  it("says the drawing goes to Meta's models, saved worlds are public and in the Gallery, and the saving device can delete", () => {
+  it("says the drawing goes to Meta's models, saved worlds are public by link and may be shown in the Gallery, and the saving device can delete", () => {
     const text = PRIVACY_POINTS.join(" ");
     expect(text).toMatch(/drawing is sent to Meta’s AI models/);
     expect(text).toMatch(/only the flattened drawing is sent/);
-    expect(text).toMatch(/anyone with its link can open it, and it’s listed in the Gallery/);
+    expect(text).toMatch(/anyone with its link can open it, and it may be shown in the Gallery/);
+    expect(text).not.toMatch(/listed in the Gallery/);
+    expect(PRIVACY_KEY).toBe("sketch-world:privacy-v2");    // v1 said every saved world is listed, so the new text shows again
     expect(text).toMatch(/device that saved a world can delete it/);
   });
 });

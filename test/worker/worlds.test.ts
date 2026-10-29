@@ -52,8 +52,9 @@ it("saves a world with a safe Checks_Row: replies 201 {id, ownerToken}, writes t
   expect(reply.id).toMatch(/^[A-Za-z0-9]{10}$/);
   expect(reply.ownerToken).toMatch(/^[A-Za-z0-9_-]{43}$/);    // 32 bytes, base64url without padding
 
-  const row = await env.DB.prepare("SELECT title, scene, safe, owner_token_hash, created_at FROM worlds WHERE id = ?1").bind(reply.id).first<Record<string, unknown>>();
-  expect(row).toMatchObject({ title: "My town", safe: 1, owner_token_hash: await hex(reply.ownerToken) });
+  const row = await env.DB.prepare("SELECT title, scene, safe, listed, owner_token_hash, created_at FROM worlds WHERE id = ?1").bind(reply.id).first<Record<string, unknown>>();
+  // listed 0: open by link, out of the Gallery until the operator approves it.
+  expect(row).toMatchObject({ title: "My town", safe: 1, listed: 0, owner_token_hash: await hex(reply.ownerToken) });
   expect(typeof row!.created_at).toBe("number");
   expect(JSON.parse(String(row!.scene))).toEqual(s);    // moves pass through unchanged
 

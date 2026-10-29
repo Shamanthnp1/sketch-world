@@ -1,5 +1,6 @@
 // Save → read → assets → gallery → delete through the router on local D1 and R2 (task 9.3), with HTTP calls only
-// apart from seeding the Checks_Row that /api/understand would write (understand.test.ts covers that write).
+// apart from seeding the Checks_Row that /api/understand would write (understand.test.ts covers that write) and the
+// operator's approve command (listed = 1) that puts the world in the Gallery.
 // Single routes and their refusals are covered in worlds.test.ts (save) and read.test.ts (read, gallery, delete, assets).
 import { env } from "cloudflare:workers";
 import { expect, it } from "vitest";
@@ -59,9 +60,11 @@ it("saves a world, serves it, its assets and its gallery entry, refuses a wrong 
   const uploaded = Object.fromEntries(Object.entries(files).map(([f, b]) => [f, { status: 200, type: contentType(f), body: b }]));
   expect(await served()).toEqual(uploaded);
 
-  // Gallery: listed with its thumb URL.
+  // Gallery: a new world is left out until the operator approves it (the README's command), then listed with its thumb URL.
   const listed = async () => { const res = await call("GET", "/api/gallery"); expect(res.status).toBe(200); return (await res.json<GalleryReply>()).worlds; };
   const item: GalleryWorld = { id, title: "Round trip town", thumb: url("thumb.jpg"), createdAt: world.createdAt };
+  expect((await listed()).map((w) => w.id)).not.toContain(id);
+  await env.DB.prepare("UPDATE worlds SET listed = 1 WHERE id = ?1").bind(id).run();
   expect(await listed()).toContainEqual(item);
 
   // A token one character off: 403, and the world, its assets and its gallery entry stay.

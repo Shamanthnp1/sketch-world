@@ -139,7 +139,7 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
     description, so it stays focusable. The page sets its label and busy state through `hud.save` ("Saving…", then
     "Share link" once the world is saved, and always on the Viewer).
   - **Share this world** (`hud.share(url, {open?, owner?})`): a modal card styled like Controls help, with one
-    sentence (anyone with the link can open it, and it's in the Gallery), the link in a read-only `--paper` field
+    sentence (anyone with the link can open it; it can appear in the Gallery once approved), the link in a read-only `--paper` field
     (selected on focus), primary Copy link (Clipboard API; without it the link is selected and the status line says
     to copy it), Open (Create only) and Close. Owners also get a hint line: this device can delete the world later.
   - **Save positions** (`hud.offerSavePositions`, owners of a saved world only): a pill before Share link,
@@ -169,7 +169,7 @@ All live in `src/ui/app.css`. Interactive ones are real `<button>`s and `<a href
 - **Gallery strip** (`renderGalleryStrip(host, items)` in `src/ui/home.ts`, styles in `app.css`): a `ul.strip` of
   `a.world-card` prints, each a `--sheet` card on its `--edge` with a 4:3 thumbnail (`width`/`height` set, lazy) and
   the title in Young Serif 18px via `textContent`, linking to `/w/:id`; hover lifts it 2px. With no items it shows
-  `.strip-empty`: four `--kraft` slots cut as cards lying flat, and one sentence saying worlds appear there.
+  `.strip-empty`: four `--kraft` slots cut as cards lying flat, and one sentence saying saved worlds appear there once approved.
   `worldCards(items)` builds the `ul.strip`; the Gallery page uses the same cards.
 - **Focus**: `:focus-visible` draws a 3px `--ink` outline 3px out on every control and link. Never removed.
 - **Forced colours**: buttons, cards, the HUD and toasts carry a transparent 1px border so they keep an edge when the
@@ -217,9 +217,9 @@ App-screen rules, loaded with `import()` from the shell; three.js loads only whe
 - **Privacy notice** (`askPrivacy` in `src/ui/privacy.ts`, `src/ui/privacy.css`; Requirement 12.1): a modal `dialog`
   card on its `--edge`, styled like Controls help, with an ink 40% backdrop. `h2` "Before your drawing is sent", a
   list of three points (the drawing goes to Meta's AI models, and for a photo only the flattened drawing; a saved
-  world is public by link and listed in the Gallery; the saving device can delete it), then primary "Send my
+  world is public by link and may be shown in the Gallery; the saving device can delete it), then primary "Send my
   drawing" and "Not now". It opens before the first upload: after a photo decodes and before the corner taps, or on
-  "Make my world" for the pad. Send my drawing stores `sketch-world:privacy-v1` in `localStorage` (kept for the page
+  "Make my world" for the pad. Send my drawing stores `sketch-world:privacy-v2` in `localStorage` (kept for the page
   load when storage is off; new wording gets a new key); Not now or Escape sends nothing and keeps the photo or the
   drawing. Tab cycles between the two buttons. Text via `textContent`.
 - **Draw here**: the pad sized so its tools, the canvas and the actions fit one screen; primary "Make my world" and
@@ -273,8 +273,8 @@ The World page layout for a saved world at `/w/:id`, loaded with `import()`; thr
 
 - `h1` "Gallery" and one lede, then the world cards (`worldCards`): "Sample worlds" (`h2`) first when there are any,
   then "Newest worlds" (`h2`, without the samples); with no samples the newest follow the lede directly.
-- Loading: one meta line "Loading the gallery…". Empty: the "No shared worlds yet" `.card` with a primary "Make a
-  world". Failed: the `.error` and a primary "Try again".
+- Loading: one meta line "Loading the gallery…". Empty: the "No worlds here yet" `.card` (saved worlds are shared by
+  link and appear here once approved) with a primary "Make a world". Failed: the `.error` and a primary "Try again".
 - Home's strip uses the same reply: the samples first, then the newest, 6 at most; "Walk a sample world" opens the
   first sample when there is one, else the Gallery.
 

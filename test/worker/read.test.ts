@@ -17,10 +17,11 @@ const scene = (backdrop: SavedScene["backdrop"]): SavedScene => ({
 });
 
 // A world as POST /api/worlds stores it: the D1 row and its R2 objects (content types as on save).
-async function insertWorld(o: { title?: string; safe?: number; createdAt?: number; backdrop?: "image" | "gradient" } = {}) {
+// `listed` defaults to 0, as on save: the operator approves a world for the Gallery by setting it to 1.
+async function insertWorld(o: { title?: string; safe?: number; listed?: number; createdAt?: number; backdrop?: "image" | "gradient" } = {}) {
   const id = randomId(), token = randomToken(), s = scene(o.backdrop ?? "image");
-  await env.DB.prepare("INSERT INTO worlds (id, title, scene, safe, owner_token_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
-    .bind(id, o.title ?? s.title, JSON.stringify(s), o.safe ?? 1, await sha256Hex(token), o.createdAt ?? Date.now()).run();
+  await env.DB.prepare("INSERT INTO worlds (id, title, scene, safe, listed, owner_token_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")
+    .bind(id, o.title ?? s.title, JSON.stringify(s), o.safe ?? 1, o.listed ?? 0, await sha256Hex(token), o.createdAt ?? Date.now()).run();
   const files = ["source.jpg", "thumb.jpg", ...(s.backdrop === "image" ? ["backdrop.jpg"] : []), "cut/0.png", "cut/2.png"];
   for (const f of files) await env.BUCKET.put(`w/${id}/${f}`, `bytes of ${f}`, { httpMetadata: { contentType: f.endsWith(".png") ? "image/png" : "image/jpeg" } });
   return { id, token, scene: s, files };
@@ -68,34 +69,53 @@ it.each<[string, () => Promise<string>]>([
   expect(await res.json()).toEqual({ error: "World not found" });
 });
 
-it("GET /api/gallery lists the 24 newest safe worlds, newest first, with thumbnail URLs", async () => {
+it("GET /api/gallery lists the 24 newest approved worlds (safe and listed), newest first, with thumbnail URLs", async () => {
   // Far-future timestamps, so these are the newest worlds whatever else the shared storage holds.
   const base = 4_000_000_000_000;
-  const safe = [];
-  for (let i = 0; i < 25; i++) safe.push(await insertWorld({ title: `World ${i}`, createdAt: base + i }));
-  const unsafe = await insertWorld({ title: "Unsafe", safe: 0, createdAt: base + 100 });
+  const listed = [];
+  for (let i = 0; i < 25; i++) listed.push(await insertWorld({ title: `World ${i}`, listed: 1, createdAt: base + i }));
+  const unsafe = await insertWorld({ title: "Unsafe", safe: 0, listed: 1, createdAt: base + 100 });
+  const unlisted = await insertWorld({ title: "Unlisted", createdAt: base + 101 });
 
   const res = await call("GET", "/api/gallery");
 
   expect(res.status).toBe(200);
   const reply = await res.json<GalleryReply>();
-  const expected = safe.slice(1).reverse().map((w, i) => ({ id: w.id, title: `World ${24 - i}`, thumb: `/a/w/${w.id}/thumb.jpg`, createdAt: base + 24 - i }));
-  expect(reply.worlds).toEqual(expected);    // the oldest of the 25 drops out; the newer unsafe one never shows
+  const expected = listed.slice(1).reverse().map((w, i) => ({ id: w.id, title: `World ${24 - i}`, thumb: `/a/w/${w.id}/thumb.jpg`, createdAt: base + 24 - i }));
+  expect(reply.worlds).toEqual(expected);    // the oldest of the 25 drops out; the newer unsafe and unlisted ones never show
   expect(reply.worlds.map((w) => w.id)).not.toContain(unsafe.id);
-  expect(reply.samples).toEqual([]);    // SAMPLE_WORLD_IDS is "" in wrangler.jsonc
+  expect(reply.worlds.map((w) => w.id)).not.toContain(unlisted.id);
+  expect(reply.samples).toEqual([]);    // the SAMPLE_WORLD_IDS worlds of wrangler.jsonc don't exist in the test D1
 });
 
-it("GET /api/gallery lists SAMPLE_WORLD_IDS in their order, skipping unknown, unsafe and malformed ids", async () => {
-  const a = await insertWorld({ title: "Sample A", createdAt: 1 }), b = await insertWorld({ title: "Sample B", createdAt: 2 });
-  const unsafe = await insertWorld({ safe: 0, createdAt: 3 });
+it("GET /api/gallery leaves out a saved world until it is approved, while GET /api/worlds/:id opens it all along", async () => {
+  const w = await insertWorld({ title: "Not yet", createdAt: 4_100_000_000_000 });    // the newest world, so only listed decides
+  const newest = async () => (await (await call("GET", "/api/gallery")).json<GalleryReply>()).worlds.map((x) => x.id);
+
+  expect((await call("GET", `/api/worlds/${w.id}`)).status).toBe(200);
+  expect(await newest()).not.toContain(w.id);
+
+  await env.DB.prepare("UPDATE worlds SET listed = 1 WHERE id = ?1").bind(w.id).run();    // the approve command (README)
+
+  expect((await newest())[0]).toBe(w.id);
+  expect((await call("GET", `/api/worlds/${w.id}`)).status).toBe(200);
+});
+
+it("GET /api/gallery lists SAMPLE_WORLD_IDS in their order, skipping unknown, unsafe and malformed ids, and counts them approved whatever listed says", async () => {
+  // Newer than every other world in this file, and listed = 0 (the default): only being a sample lists them.
+  const t = 5_000_000_000_000;
+  const a = await insertWorld({ title: "Sample A", createdAt: t + 1 }), b = await insertWorld({ title: "Sample B", createdAt: t + 2 });
+  const unsafe = await insertWorld({ safe: 0, createdAt: t + 3 });
   const ids = ` ${b.id}, nope,${unsafe.id},${randomId()},${a.id},${b.id},`;
 
   const res = await gallery(new Request("https://example.com/api/gallery"), { ...env, SAMPLE_WORLD_IDS: ids });
 
-  expect((await res.json<GalleryReply>()).samples).toEqual([
-    { id: b.id, title: "Sample B", thumb: `/a/w/${b.id}/thumb.jpg`, createdAt: 2 },
-    { id: a.id, title: "Sample A", thumb: `/a/w/${a.id}/thumb.jpg`, createdAt: 1 },
-  ]);
+  const reply = await res.json<GalleryReply>();
+  const B = { id: b.id, title: "Sample B", thumb: `/a/w/${b.id}/thumb.jpg`, createdAt: t + 2 };
+  const A = { id: a.id, title: "Sample A", thumb: `/a/w/${a.id}/thumb.jpg`, createdAt: t + 1 };
+  expect(reply.samples).toEqual([B, A]);
+  expect(reply.worlds.slice(0, 2)).toEqual([B, A]);    // newest first in the newest list too
+  expect(reply.worlds.map((w) => w.id)).not.toContain(unsafe.id);
 });
 
 it("DELETE /api/worlds/:id with the owner token deletes the D1 row and every R2 object of that world, then replies 204", async () => {

@@ -1,4 +1,4 @@
-// POST /api/worlds saves a world (Requirements 10.1–10.4, 12.8, 16.1–16.3, 16.5). Multipart fields, the files
+// POST /api/worlds saves a world (Requirements 10.1–10.4, 10.13, 12.8, 16.1–16.3, 16.5). Multipart fields, the files
 // named after their R2 key under w/<id>/ (design.md "R2 keys"):
 //   scene          SavedScene JSON text (≤ 64 KB), checked with shared/saved.ts, `moves` included
 //   source.jpg     JPEG ≤ 400 KB: the exact bytes sent to /api/understand
@@ -67,6 +67,7 @@ export async function saveWorld(req: Request, env: Env): Promise<Response> {
     const puts = await Promise.allSettled(uploads.map((u, i) => env.BUCKET.put(keys[i]!, u.bytes, { httpMetadata: { contentType: u.info.type } })));
     const failed = puts.find((p) => p.status === "rejected");
     if (failed) throw failed.reason;
+    // listed stays 0: the world opens by link at once, and shows in the Gallery once the operator approves it.
     await env.DB.prepare("INSERT INTO worlds (id, title, scene, safe, owner_token_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
       .bind(id, scene.title, JSON.stringify(scene), check.safe, await sha256Hex(ownerToken), Date.now())
       .run();

@@ -249,7 +249,7 @@ export function mountHud(host: HTMLElement, world: World, opts: HudOptions): Hud
     acts.append(copy);
     if (o.open) acts.append(Object.assign(el("a", "btn", "Open"), { href: o.open }));
     acts.append(close);
-    d.append(h, el("p", "", "Anyone with this link can open the world, and it’s listed in the Gallery."), label, link, said);
+    d.append(h, el("p", "", "Anyone with this link can open the world. It can appear in the Gallery once approved."), label, link, said);
     if (o.owner) d.append(el("p", "hud-hint", "This device can delete the world later: open the link here and choose Delete world."));
     d.append(acts);
     copy.addEventListener("click", async () => {

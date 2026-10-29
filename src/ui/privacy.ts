@@ -3,12 +3,12 @@
 // localStorage; Not now, Escape or closing it sends nothing. Text via textContent only.
 import "./privacy.css";
 
-export const PRIVACY_KEY = "sketch-world:privacy-v1"; // a new notice text gets a new key, so it shows again
+export const PRIVACY_KEY = "sketch-world:privacy-v2"; // a new notice text gets a new key, so it shows again
 
 export const PRIVACY_TITLE = "Before your drawing is sent";
 export const PRIVACY_POINTS = [
   "Your drawing is sent to Meta’s AI models, which find the things in it and cut them out. For a photo, only the flattened drawing is sent; the photo itself stays on this device.",
-  "A world you save is public: anyone with its link can open it, and it’s listed in the Gallery.",
+  "A world you save is public: anyone with its link can open it, and it may be shown in the Gallery.",
   "The device that saved a world can delete it later.",
 ] as const;
 

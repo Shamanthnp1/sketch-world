@@ -55,7 +55,7 @@ export async function getWorld(id: string): Promise<WorldReply> {
   return (await send(`/api/worlds/${encodeURIComponent(id)}`)).json() as Promise<WorldReply>;
 }
 
-/** GET /api/gallery: the 24 latest safe worlds, newest first, and the sample worlds. */
+/** GET /api/gallery: the 24 latest approved worlds, newest first, and the sample worlds. */
 export async function getGallery(): Promise<GalleryReply> {
   return (await send("/api/gallery")).json() as Promise<GalleryReply>;
 }

@@ -148,7 +148,7 @@ export function mountHome(main: HTMLElement): void {
 export function renderGalleryStrip(host: Element, items: GalleryItem[]): void {
   if (!items.length) {
     host.innerHTML = `<div class="strip-empty"><div class="strip-slots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-      <p>No shared worlds yet. Save a world and it pops up here, newest first.</p></div>`;
+      <p>No worlds here yet. Worlds you save are shared by link, and pop up here once approved.</p></div>`;
     return;
   }
   host.replaceChildren(worldCards(items));

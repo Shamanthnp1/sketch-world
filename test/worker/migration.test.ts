@@ -20,6 +20,14 @@ it("stores and reads a world row", async () => {
   expect(row).toEqual({ title: "My town", scene: '{"v":1}', safe: 1, owner_token_hash: "hash", created_at: 1_700_000_000_000 });
 });
 
+it("adds worlds.listed with default 0 and puts it in the gallery index (0002_listed.sql)", async () => {
+  await env.DB.prepare("INSERT INTO worlds (id, title, scene, safe, owner_token_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+    .bind("bC4dE6fG8h", "New town", '{"v":1}', 1, "hash", 1_700_000_000_000).run();
+  expect(await env.DB.prepare("SELECT listed FROM worlds WHERE id = ?1").bind("bC4dE6fG8h").first()).toEqual({ listed: 0 });
+  const index = await env.DB.prepare("SELECT sql FROM sqlite_master WHERE name = 'worlds_gallery'").first<string>("sql");
+  expect(index).toBe("CREATE INDEX worlds_gallery ON worlds (safe, listed, created_at DESC)");
+});
+
 it("starts a usage day at 0 micro-dollars", async () => {
   await env.DB.prepare("INSERT INTO usage (day) VALUES (?1)").bind("2026-10-28").run();
   const row = await env.DB.prepare("SELECT spent_micro FROM usage WHERE day = ?1").bind("2026-10-28").first();

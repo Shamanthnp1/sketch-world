@@ -19,8 +19,8 @@ const HEAD = `
   </div>`;
 const EMPTY = `
   <section class="card gallery-empty" aria-labelledby="gallery-empty">
-    <h2 id="gallery-empty">No shared worlds yet</h2>
-    <p>Save a world and it appears here as a card.</p>
+    <h2 id="gallery-empty">No worlds here yet</h2>
+    <p>Worlds you save are shared by link, and appear here once approved.</p>
     <div class="actions"><a class="btn primary" href="/create">Make a world</a></div>
   </section>`;
 

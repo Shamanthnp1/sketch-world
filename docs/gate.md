@@ -285,3 +285,25 @@ Times run from Use the whole photo to the open world and to the backdrop reply; 
 Spend: **$0.085** (2 understand, 1 point, 14 SAM and 2 backdrop calls at the design.md fixed estimates; matches the `usage` row). Live spend including the gate, its re-check, the task 11.3 sample worlds and the task 12 local check: **$0.4725**.
 
 **Part 2** (a later run) will delete the old worlds `NjaZ1IphRu` and `VcULvxRZQO` with their owner tokens and set `SAMPLE_WORLD_IDS` to `wLeiDFftn0,Tco7s8pREl,3gQJnD3lHP`, then deploy again and push. Until then the Gallery and Home still show the old three.
+
+## Checkpoint deploy, part 2 (task 12)
+
+Date: 2026-10-29. Part 2 of 2, approved by the user.
+
+**Old sample worlds deleted** through the app's own route, `DELETE /api/worlds/<id>` with the owner token from the gitignored `sample-owners.json` and no Origin header: `NjaZ1IphRu` (the old 1.jpeg world, "Underwater sea life") and `VcULvxRZQO` (the old ms2 world, "Sunny valley with house and river"), 204 each. Afterwards `GET /api/worlds/<id>` and `GET /a/w/<id>/thumb.jpg` reply 404 for both, and so do `source.jpg`, `backdrop.jpg` and `cut/0.png`–`cut/39.png` (43 paths each), so the R2 cleanup ran. The kept worlds still reply 200, and the remote `worlds` table holds only `Tco7s8pREl`, `wLeiDFftn0` and `3gQJnD3lHP`. The two deleted entries are removed from `sample-owners.json`; the other three stay.
+
+**`SAMPLE_WORLD_IDS`** = `"wLeiDFftn0,Tco7s8pREl,3gQJnD3lHP"` in `wrangler.jsonc`. Home's "Walk a sample world" opens the first.
+
+Version id **`65a3f380-69e5-4812-919a-bea7d0ad9c2f`**, deployed with wrangler 4.153.0 by `npx wrangler deploy --secrets-file .dev.vars` from `fb3730e` plus the `wrangler.jsonc` change committed with this note (622 tests, typecheck and build clean). Same account (b48bb45c…f753); `.dev.vars` holds only `MODEL_API_KEY`. No asset changed (29 files read, none uploaded), and the bindings are those of part 1 with the new `SAMPLE_WORLD_IDS`. No migrations. No other resource was touched.
+
+**Smoke**, no model calls: `usage` for 2026-10-29 is still 85,000 µ$ and `usage_ip` still one row at 85,000 µ$. The browser run aborted any model request or non-GET `/api/worlds` request, and none was made.
+
+| Check | Result |
+|---|---|
+| `GET /api/gallery` | 200. `samples`: wLeiDFftn0, Tco7s8pREl, 3gQJnD3lHP, in that order. `worlds`: the same 3, newest first (3gQJnD3lHP, wLeiDFftn0, Tco7s8pREl). Neither deleted id appears |
+| Home | "Walk a sample world" links `/w/wLeiDFftn0` and opens "Underwater Sea Friends"; the strip shows the 3 samples |
+| `/w/wLeiDFftn0` (`playwright-cli`, headless Chrome, 1280 × 800, fresh context) | 7 cut-out PNGs and `backdrop.jpg`, all 200. Pop-up: the 4 standing cards' folds were 0.003, 0.19, 0 and 0 on the first frame and 1 after 2.5 s. The 3 floating cards (the scene's sky objects: fish ×2 and the turtle) hang at y 3.3–5.2 and moved 0.6–1.7 units in 2 s |
+| `/gallery` | One group, "Sample worlds", with 3 cards in the gallery order, each thumbnail loaded (640 × 400) |
+| `/w/NjaZ1IphRu` | "This world isn’t here" and "It may have been deleted, or the link is mistyped.", no canvas; its `GET /api/worlds/NjaZ1IphRu` was 404 |
+
+Console: one error, the browser's "Failed to load resource" for that expected 404; no page errors. Spend: $0. Live spend stays **$0.4725**.

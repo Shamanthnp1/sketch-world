@@ -143,7 +143,7 @@ it("replies 503 {mode: 'sample'} with no second Spark call when the cap has room
   const res = await understand(form({ image: png(drawingBytes) }));
 
   expect(res.status).toBe(503);
-  expect(await res.json()).toEqual({ mode: "sample", error: CAP_REACHED });
+  expect(await res.json()).toEqual({ mode: "sample", reason: "daily", error: CAP_REACHED });
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(await spent("2000-01-02")).toBe(CAP);    // the first attempt's reservation, the retry's refused
   expect(await checks()).toEqual([]);

@@ -34,7 +34,7 @@ export async function point(req: Request, env: Env): Promise<Response> {
   for (let attempt = 1; attempt <= ATTEMPTS && !reply; attempt++) {
     // Each attempt reserves the Spark estimate first (Requirement 11.5); refused → the 503 {mode: "sample"}
     // with no Spark call. A MetaApiError propagates (router → 502).
-    const refused = await reserveCall(env, "spark");
+    const refused = await reserveCall(env, "spark", req);
     if (refused) return refused;
     const parsed = SparkBoxes.safeParse(parseJson(await askPoint(env, bytes, info.type, objects.data)));
     if (parsed.success) reply = parsed.data;

@@ -34,6 +34,15 @@ it("starts a usage day at 0 micro-dollars", async () => {
   expect(row).toEqual({ spent_micro: 0 });
 });
 
+it("adds usage_ip, one row per UTC day and client starting at 0 micro-dollars (0003_usage_ip.sql)", async () => {
+  const add = (client: string) => env.DB.prepare("INSERT INTO usage_ip (day, client) VALUES (?1, ?2)").bind("2026-10-28", client).run();
+  await add("203.0.113.7");
+  await add("2001:db8:1:2::/64");
+  await expect(add("203.0.113.7")).rejects.toThrow(/UNIQUE/);
+  const { results } = await env.DB.prepare("SELECT client, spent_micro FROM usage_ip WHERE day = ?1 ORDER BY client").bind("2026-10-28").all();
+  expect(results).toEqual([{ client: "2001:db8:1:2::/64", spent_micro: 0 }, { client: "203.0.113.7", spent_micro: 0 }]);
+});
+
 it("stores and reads a checks row", async () => {
   const sha = "a".repeat(64);
   await env.DB.prepare("INSERT INTO checks (sha256, safe, created_at) VALUES (?1, ?2, ?3)").bind(sha, 0, 1_700_000_000_000).run();

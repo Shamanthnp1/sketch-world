@@ -27,7 +27,7 @@ export async function understand(req: Request, env: Env): Promise<Response> {
   for (let attempt = 1; attempt <= ATTEMPTS && !scene; attempt++) {
     // Each attempt reserves the Spark estimate first, so the retry reserves again (Requirements 3.6, 11.5).
     // Refused → the 503 {mode: "sample"} with no Spark call. A MetaApiError propagates (router → 502).
-    const refused = await reserveCall(env, "spark");
+    const refused = await reserveCall(env, "spark", req);
     if (refused) return refused;
     const parsed = SparkScene.safeParse(parseJson(await askScene(env, bytes, info.type)));
     if (parsed.success) scene = parsed.data;

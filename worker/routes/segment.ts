@@ -28,7 +28,7 @@ export async function segment(req: Request, env: Env): Promise<Response> {
   if (!(await checkedSafe(env, bytes))) return jsonError(403, NOT_CHECKED);
 
   // Reserve the SAM estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no SAM call.
-  const refused = await reserveCall(env, "sam");
+  const refused = await reserveCall(env, "sam", req);
   if (refused) return refused;
   const res = await metaFetch(env, {
     route: "segment",

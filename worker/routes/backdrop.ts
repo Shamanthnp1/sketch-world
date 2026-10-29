@@ -19,7 +19,7 @@ export async function backdrop(req: Request, env: Env): Promise<Response> {
   if (!body.success) return jsonError(400, BAD_BODY);
 
   // Reserve the Muse Image estimate first (Requirement 11.5); refused → the 503 {mode: "sample"} with no call.
-  const refused = await reserveCall(env, "image");
+  const refused = await reserveCall(env, "image", req);
   if (refused) return refused;
   let png: Uint8Array<ArrayBuffer>;
   try {

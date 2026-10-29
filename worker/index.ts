@@ -46,6 +46,11 @@ export default {
         allowed.push(r.method);
         continue;
       }
+      // A page on another site can send its visitors' browsers here with a simple POST (multipart, or text/plain JSON to
+      // /api/backdrop) that needs no CORS preflight, and spend the daily budget from many IPs. Browsers always send
+      // Origin with a POST, PATCH or DELETE, so a foreign one is refused; requests without Origin (curl, scripts) pass.
+      const origin = req.headers.get("Origin");
+      if (req.method !== "GET" && origin !== null && origin !== url.origin) return jsonError(403, "Requests from other sites are not allowed");
       try {
         const refused = r.limit && (await rateLimit(env, r.limit, req));
         if (refused) return refused;

@@ -240,4 +240,6 @@ Hide it again (it still opens by link):
 $env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDATE worlds SET listed = 0 WHERE id = '<id>'"
 ```
 
+**Per-visitor budget and timeout re-reservation (review findings 5 and 9).** `PER_IP_DAILY_USD` = `"0.5"`: each client (an IPv4 address or an IPv6 /64) may spend at most $0.50 per UTC day, tracked in the `usage_ip` table of `migrations/0003_usage_ip.sql`. Over it the Worker replies 503 `{mode: "sample", reason: "visitor"}`. A model call that timed out is reserved again before its retry. The same `migrations apply ... --remote` step applies 0003 after 0002; `wrangler deploy` must come after it, since every model call now writes `usage_ip`.
+
 **Safe gate on segment and point (review finding 11).** Both routes now need a `checks` row with `safe = 1` for the SHA-256 of their image, the row `/api/understand` writes. Without one they reply 403 "Only drawings checked by this app can be cut out", after the input caps and before any cost is reserved. Create and the probe's Live mode send the same Work_Image JPEG `Blob` to understand, segment and point, so a normal run is unchanged.

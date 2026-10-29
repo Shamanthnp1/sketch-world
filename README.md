@@ -117,7 +117,7 @@ flowchart LR
   end
   subgraph Worker["Cloudflare Worker sketch-world"]
     RT["Router: input caps,<br/>rate limits, daily cost cap"]
-    RT --> D1[("D1: worlds, checks, usage")]
+    RT --> D1[("D1: worlds, checks,<br/>usage, usage_ip")]
     RT --> R2[("R2: drawings, cut-outs,<br/>skies, thumbnails")]
   end
   FL -->|"/api/understand"| RT
@@ -166,12 +166,18 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 - **Owner tokens** are 32 random bytes, stored only as SHA-256 and compared in constant time
   (`crypto.subtle.timingSafeEqual`). Deleting a world and saving its positions need the token, which lives in the
   saving device's `localStorage`.
-- **Rate limits** per IP per 60 s: 6 for understand, point, backdrop and saving; 30 for segment. Over the limit the
-  Worker replies 429 with `Retry-After`. Size, type and field caps reply 400, 413 or 415.
-- **Daily cost cap:** each model call first reserves its estimate in one conditional D1 update. On the deployed site
-  the cap is $5 per UTC day (raised from $2 for judging week). When it is reached, the Worker skips the call and replies 503 `{mode: "sample"}`, and the
-  Create page shows Sample_Mode ("No more new worlds today") with links to the sample worlds and the Gallery, which
-  keep working.
+- **Rate limits** per client per 60 s: 6 for understand, point, backdrop and saving; 30 for segment. A client is an
+  IPv4 address or an IPv6 /64, since one IPv6 user can pick a new address in their /64 for every request. Over the
+  limit the Worker replies 429 with `Retry-After`. Size, type and field caps reply 400, 413 or 415.
+- **Daily cost cap:** each model call first reserves its estimate in D1. On the deployed site the cap is $5 per UTC
+  day (raised from $2 for judging week). When it is reached, the Worker skips the call and replies 503
+  `{mode: "sample", reason: "daily"}`, and the Create page shows Sample_Mode ("No more new worlds today") with links
+  to the sample worlds and the Gallery, which keep working.
+- **Per-visitor budget:** each client may spend at most $0.50 of that per UTC day (`PER_IP_DAILY_USD`, about 10–14
+  worlds), so one person can't use up the day for everyone. Over it, the reply is 503 `{mode: "sample", reason:
+  "visitor"}` and Sample_Mode says "You've made a lot of worlds today". One D1 batch reserves on both the day's total
+  and the client's (table `usage_ip`), so neither can pass its cap, even under concurrent calls. A model call that
+  timed out is reserved again before it is retried, since Meta may have billed it.
 - **Headers:** a CSP of `default-src 'self'; img-src 'self' blob: data:; connect-src 'self'` and
   `X-Content-Type-Options: nosniff`. No third-party scripts, fonts or CDNs.
 - **Storage:** `store: false` on every model call, D1 only through bound parameters, and `GET /a/:key` serves only

@@ -172,3 +172,50 @@ Redeployed twice (both approved), static assets and vars only, no new resource:
 | `e74e84d4-1bfb-4ec4-b78e-3fb73f647df6` | `public/_headers`: `Content-Type: text/plain; charset=utf-8` for `/licenses/*`, since without a charset Chrome decoded the licence's curly quotes as windows-1252 |
 
 Smoke on `e74e84d4`: `GET /api/gallery` lists the 3 worlds and the 3 samples in that order; Home's "Walk a sample world" links `/w/NjaZ1IphRu` and opens it; `/licenses/SAM-LICENSE.txt` is 200 `text/plain; charset=utf-8` with the CSP and `nosniff`, byte-identical to `node_modules/@meta-sam/parser/LICENSE`, and the footer link loads it from an app page; the footer's Source on GitHub link is https://github.com/Shamanthnp1/sketch-world.
+
+## Checkpoint fixes (task 12)
+
+Date: 2026-10-29
+
+Two fixes from the sample worlds: ms2's grass dots became 10 cards (3 tiny box cut-outs and 7 green threshold squares), and 1.jpeg's fish and turtle had sky false, so they walked on the sand.
+
+**Measured sizes.** Long side and mask area at the 1024 px scale (× 1024 ÷ the Work_Image's long side). The dots come from the saved ms2 world (`VcULvxRZQO`: its bboxes and the alpha of its cut PNGs, fetched from `/a/w/`, no model calls), the rest from the noun masks in the saved gate replies.
+
+| What | Long side (px) | Mask area (px) |
+|---|---|---|
+| ms2 grass dots, box SAM masks (3) | 11, 11, 15 | 55, 90, 109 |
+| ms2 grass dots, Spark boxes of the 7 threshold squares (crop minus the 4 px padding) | 11–12 | crops 19–20 px: 4 all opaque and 1 all but 3 px (the green squares); 2 partial, 38 px within 9 × 13 and 87 px spread over 20 × 18 |
+| Birds: ms2 (5), ms3 (3) | 25–31, 26–43 | 256–330, 245–327 |
+| Sparkle stars: 2.jpeg (3), 3.jpeg (3 kept) | 28–40 | 297–414 |
+| 3.jpeg's 2 extra "star" blobs on the bush flowers (already dropped by count) | 13, 14 | 115, 117 |
+| Other small noun masks: 3.jpeg flower head, ms3 flower heads, ms1 sun, ms2 thin cloud | 40, 41–80, 48, 71 | 1147, 1173–4063, 1744, 674 |
+| 1.jpeg crab, starfish | 195, 134 | |
+
+**Rule.** `MIN_SIDE = 20` px per 1024 px of the Work_Image's long side (20 px on ms2, 13 px on 1.jpeg's 671 px), halfway between the largest dot (15) and the smallest real object (a bird, 25). There is no area rule: the long side alone separates every measured case, and an area limit would also drop real objects drawn in thin open strokes. In `src/cut/chain.ts`:
+- a box SAM mask whose set pixels have a long side under the limit is rejected, like an IoU miss, so the box falls through to the threshold step;
+- a Spark box under the limit gets no threshold cut-out at all, whether the crop comes out all transparent, all opaque (the green squares) or partial (the 87 px grass patch spans 20 × 18 px, so a rule on the cut-out's own size would have kept it);
+- a threshold cut-out whose trimmed bbox is under the limit is dropped;
+- an object left with no instance is in `notFound` ("Not found in your drawing: flower"); noun masks have no size limit, and the whole-crop rule (5.7) still holds for boxes at or above the limit.
+
+**Tight bbox.** Every sam-box and threshold instance's bbox is trimmed to its mask's set pixels, with the mask cropped to match, so `cardArt` no longer stretches a threshold cut-out back to a loose Spark box. SAM rasters can have empty margins (1 px on ms2's mountain and on one 1.jpeg fish), so sam-box masks are trimmed too. Noun masks are left as they are.
+
+**Replay, no calls.** The gate's saved noun replies through `buildInstances` with a fake ChainIO. For ms2, the sample world's scene and its 10 flower boxes and 3 box masks were rebuilt from the saved world, on its `source.jpg`.
+
+| Replay | Before | After |
+|---|---|---|
+| ms2, sample-world scene | 25: 15 noun, 3 sam-box dots (10–15 px), 7 threshold squares (19–22 px) | 15, all noun: tree, mountain ×2, house, river, sun, cloud ×4, bird ×5; flower not found (the 4 box calls still happen if Spark lists dots) |
+| 1.jpeg, sample-world scene | 7, seaweed sam-box 145 × 166 | the same 7 (the seaweed mask has no margins) |
+| 2.jpeg, 3.jpeg, ms1, ms3 gate scenes, noun stage | 14, 20, 8, 20 | the same; 3 stars in 2.jpeg and in 3.jpeg, 3 birds in ms3, 5 in ms2 |
+
+On these drawings the trimming only changes the dropped dots: every kept sam-box mask fills its raster, and the seaweed box cut by threshold instead (box SAM forced to fail) touches all four crop edges (154 × 175 px).
+
+**Scene prompt.** Two rule changes: small dots, specks and scattered marks are texture even when coloured (red dots in grass), with a flower listed only when it has a drawn head; and sky is true for things that swim or float in water above the ground (fish, turtle, jellyfish, balloon, kite), false for things on the ground or the sea floor (crab, starfish, seaweed, coral).
+
+**Live check.** Local `wrangler dev` on port 8796 after `npm run build`, one `POST /api/understand` per drawing with the sample worlds' `source.jpg` (the exact JPEGs sent at task 11.3), no SAM calls.
+
+| Drawing | Spark listed | Before (task 11.3) | Spark time |
+|---|---|---|---|
+| ms2.png | tree, mountain ×2, house, river, sun, cloud ×4, bird ×5 (the 15 counted objects); no flower, no field | the same plus flower ×10 | 5.8 s |
+| 1.jpeg | fish ×2 and sea turtle with sky true; crab, starfish, seaweed, coral with sky false | fish and turtle sky false | 7.0 s |
+
+One run per drawing, so this can't separate the prompt change from run-to-run variance. The local D1 had no tables (its database id changed at deploy), so the first two requests got a 500 before any model call; `wrangler d1 migrations apply sketch-world-db --local` fixed that. Both Spark calls succeeded on attempt 1. Spend: **$0.02** (local `usage` row 20,000 µ$). Live spend including the gate, its re-check and the sample worlds: **$0.3875**. Not deployed; the saved sample worlds keep their old cards until they are made again.

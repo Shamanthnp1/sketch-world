@@ -3,11 +3,13 @@
 // A fake ChainIO answers each noun call, the point call and each box call from a drawn outcome: masks that pass,
 // masks that are rejected (or none), or a rejected promise. The checks rebuild each stage from the fake's call log
 // and masks painted into image-sized arrays; only thresholdMask (checked by Property 4) is reused from src.
+// Box-stage cut-outs follow the size limit and trimming of Requirements 5.13 and 5.14: some images are up to 256 px
+// wide and some boxes a few pixels across, so boxes and cut-outs under the limit (up to 5 px here) occur.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ALL_TYPES, type ObjType, type PxBox, type SparkScene } from "../../shared/scene";
 import type { GridBox, PointObject, PointReply } from "../../src/api";
-import { buildInstances, MAX_BOX_CALLS, MAX_INSTANCES, type ChainIO, type WorkPixels } from "../../src/cut/chain";
+import { buildInstances, MAX_BOX_CALLS, MAX_INSTANCES, MIN_SIDE, type ChainIO, type WorkPixels } from "../../src/cut/chain";
 import { thresholdMask } from "../../src/cut/threshold";
 import type { Instance } from "../../src/cut/types";
 import type { MaskRaster } from "../../src/sam/parse";
@@ -35,8 +37,10 @@ const nounSpec = (W: number, H: number): fc.Arbitrary<NounSpec> => fc.oneof(
   },
   { weight: 1, arbitrary: fc.constant({ kind: "huge" as const }) },
 );
-// A box on Spark's 0–1000 grid with x0 < x1 and y0 < y1, as the Worker's zod check guarantees.
-const span = fc.tuple(fc.integer({ min: 0, max: 999 }), fc.integer({ min: 1, max: 700 })).map(([a, d]): [number, number] => [a, Math.min(1000, a + d)]);
+// A box on Spark's 0–1000 grid with x0 < x1 and y0 < y1, as the Worker's zod check guarantees; half the spans are
+// at most 20 grid units, so tiny boxes are common.
+const span = fc.tuple(fc.integer({ min: 0, max: 999 }), fc.oneof(fc.integer({ min: 1, max: 20 }), fc.integer({ min: 1, max: 700 })))
+  .map(([a, d]): [number, number] => [a, Math.min(1000, a + d)]);
 const gridBox = fc.tuple(span, span).map(([[x0, x1], [y0, y1]]): GridBox => ({ x0, y0, x1, y1 }));
 const objArb = (W: number, H: number): fc.Arbitrary<Obj> => fc.integer({ min: 1, max: 10 }).chain((count) => fc.record({
   type: fc.constantFrom(...ALL_TYPES), count: fc.constant(count), sky: fc.boolean(),
@@ -49,7 +53,9 @@ const boxSpec = (W: number, H: number): fc.Arbitrary<BoxSpec> => fc.oneof(
   { weight: 2, arbitrary: fc.constant({ kind: "fit" as const }) },
   { weight: 1, arbitrary: rect(W, H, W, H).map((r) => ({ kind: "rect" as const, r })) },
 );
-const scenario: fc.Arbitrary<Scenario> = fc.record({ W: fc.integer({ min: 24, max: 48 }), H: fc.integer({ min: 24, max: 48 }) })
+// W up to 256 makes the size limit MIN_SIDE · W / 1024 up to 5 px (under 1 px for W ≤ 48, where nothing is tiny).
+const width = fc.oneof(fc.integer({ min: 24, max: 48 }), fc.integer({ min: 120, max: 256 }));
+const scenario: fc.Arbitrary<Scenario> = fc.record({ W: width, H: fc.integer({ min: 24, max: 48 }) })
   .chain(({ W, H }) => fc.record({
     W: fc.constant(W), H: fc.constant(H),
     dark: fc.array(rect(W, H, 16, 16), { maxLength: 4 }),
@@ -126,16 +132,38 @@ const iou30 = (a: PxBox, b: PxBox) => {
   const inter = Math.max(0, iw) * Math.max(0, ih);
   return 10 * inter >= 3 * (a.w * a.h + b.w * b.h - inter);
 };
-/** Requirement 5.5/5.7: thresholdMask of the crop, or the whole crop opaque if that has no opaque pixel. */
-function thresholdOf(work: WorkPixels, r: PxBox): Uint8Array {
-  const crop = new Uint8ClampedArray(4 * r.w * r.h);
+/** Requirement 5.13: a long side under MIN_SIDE px per 1024 px of the image's long side L. */
+const tiny = (w: number, h: number, L: number) => Math.max(w, h) < (MIN_SIDE * L) / 1024;
+/** Requirement 5.14: the raster cut to the bounding box of its set pixels, or null when none is set. */
+function trimmed(m: MaskRaster): MaskRaster | null {
+  const xs: number[] = [], ys: number[] = [];
+  m.data.forEach((v, k) => v && (xs.push(k % m.width), ys.push(Math.floor(k / m.width))));
+  if (!xs.length) return null;
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
+  const data = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) data[y * w + x] = m.data[(y0 + y) * m.width + x0 + x];
+  return { data, width: w, height: h, left: m.left + x0, top: m.top + y0 };
+}
+/**
+ * Requirements 5.5, 5.7, 5.13, 5.14: the threshold cut-out of a box, or null when the box or the cut-out is tiny:
+ * thresholdMask of the crop padded by 4 px (the whole crop opaque if that has no opaque pixel), trimmed.
+ */
+function thresholdCut(work: WorkPixels, px: PxBox): MaskRaster | null {
+  const L = Math.max(work.width, work.height);
+  if (tiny(px.w, px.h, L)) return null;
+  const r = pad(px, work.width, work.height), crop = new Uint8ClampedArray(4 * r.w * r.h);
   for (let y = 0; y < r.h; y++) {
     const from = 4 * ((r.y + y) * work.width + r.x);
     crop.set(work.data.subarray(from, from + 4 * r.w), 4 * y * r.w);
   }
-  const m = thresholdMask(crop, r.w, r.h);
-  return m.includes(1) ? m : m.fill(1);
+  const m = thresholdMask(crop, r.w, r.h), t = trimmed(raster(r, m.includes(1) ? m : m.fill(1)));
+  return t && !tiny(t.width, t.height, L) ? t : null;
 }
+/** The instance has exactly this raster as its bbox and mask. */
+const same = (o: Instance, m: MaskRaster) => {
+  const r = rectOf(m);
+  return o.bbox.x === r.x && o.bbox.y === r.y && o.bbox.w === r.w && o.bbox.h === r.h && o.mask.every((v, k) => v === m.data[k]);
+};
 
 async function check(s: Scenario) {
   const { W, H } = s;
@@ -216,43 +244,56 @@ async function check(s: Scenario) {
   });
 
   // sam-box: the reply's boxes in reply order, scaled; box SAM for the first MAX_BOX_CALLS of them, in that order.
-  // A sent object with no box is not found; one with boxes gets one instance per box, in box order.
-  const boxes = (log.reply?.boxes ?? []).map((b, k) => ({ k, objIndex: sent[b.objIndex], px: toPx(b.box, W, H) }));
+  // A box's fits are its masks with bbox IoU ≥ 0.3 whose set pixels are not tiny, trimmed (5.4, 5.13, 5.14); `cut` is
+  // its threshold cut-out, null when tiny. A box gives one instance (sam-box from a fit, else `cut`) or, when it gets
+  // no sam-box and `cut` is null, none.
+  const L = Math.max(W, H);
+  const boxes = (log.reply?.boxes ?? []).map((b, k) => {
+    const px = toPx(b.box, W, H);
+    const fits = ((k < MAX_BOX_CALLS && log.boxMasks[k]) || []).filter((m) => iou30(rectOf(m), px))
+      .map(trimmed).filter((t): t is MaskRaster => !!t && !tiny(t.width, t.height, L));
+    return { k, objIndex: sent[b.objIndex], px, fits, cut: thresholdCut(work, px) };
+  });
   expect(log.box).toEqual(boxes.slice(0, MAX_BOX_CALLS).map((b) => b.px));
-  expect(notFound).toEqual(sent.filter((i) => !boxes.some((b) => b.objIndex === i)));
+  // Each sent object's instances come from its boxes in box order: a box that gives none must have no threshold
+  // cut-out, and with nothing cut every later box of a complete object also gives none.
+  const byBox = new Map<number, Instance>();
+  for (const i of sent) {
+    const mine = of(i), bs = boxes.filter((b) => b.objIndex === i);
+    let p = 0;
+    for (const o of mine) {
+      const gives = (b: (typeof bs)[number]) =>
+        o.source === "sam-box" ? b.fits.some((f) => same(o, f)) : o.source === "threshold" && !!b.cut && same(o, b.cut);
+      for (; p < bs.length && !gives(bs[p]); p++) expect(bs[p].cut).toBeNull();
+      expect(p).toBeLessThan(bs.length);
+      byBox.set(bs[p++].k, o);
+    }
+    if (complete(i)) for (; p < bs.length; p++) expect(bs[p].cut).toBeNull();
+  }
+  // Not found: the sent objects left with no instance (no box, or every box dropped), in scene order.
+  expect(notFound).toEqual(sent.filter((i) => notFound.includes(i)));
+  if (!capped) expect(notFound).toEqual(sent.filter((i) => of(i).length === 0));
+  for (const i of sent) {
+    const bs = boxes.filter((b) => b.objIndex === i);
+    if (bs.some((b) => b.cut)) expect(notFound).not.toContain(i);
+    if (bs.every((b) => !b.cut && !b.fits.length)) expect(notFound).toContain(i);
+  }
   scene.objects.forEach((_, i) => {
     const has = of(i).length > 0, nf = notFound.includes(i);
     expect(has && nf).toBe(false);
     if (!capped || i <= last) expect(has || nf).toBe(true);
   });
-  const byBox = new Map<number, Instance>();
-  for (const i of sent) {
-    const mine = of(i), bs = boxes.filter((b) => b.objIndex === i);
-    if (complete(i)) expect(mine.length).toBe(bs.length);
-    else expect(mine.length).toBeLessThanOrEqual(bs.length);
-    mine.forEach((o, m) => byBox.set(bs[m].k, o));
-  }
-  const nounMasks = out.filter((o) => o.source === "sam-noun").map(asRaster);
-  for (const { k, px } of boxes) {
-    const o = byBox.get(k);
-    if (!o) continue; // cut by the cap
-    const fits = ((k < MAX_BOX_CALLS && log.boxMasks[k]) || []).filter((m) => iou30(rectOf(m), px));
-    if (o.source === "sam-box") {
-      const m = fits.find((f) => f.data === o.mask);
-      expect(m).toBeDefined();
-      expect(o.bbox).toEqual(rectOf(m!));
-    } else {
-      expect(o.source).toBe("threshold");
-      const r = pad(px, W, H);
-      expect(o.bbox).toEqual(r);
-      expect(o.mask).toEqual(thresholdOf(work, r));
-    }
-    // With nothing cut, every accepted mask is visible: the box is sam-box exactly when one of its fitting masks
-    // clashes with no noun mask and no earlier box's mask; otherwise the threshold cut-out is used.
-    if (!capped) {
+  // With nothing cut, every accepted mask is visible: a box is sam-box exactly when one of its fits clashes with no
+  // noun mask and no earlier box's mask; otherwise it gives its threshold cut-out, or nothing when that is null.
+  if (!capped) {
+    const nounMasks = out.filter((o) => o.source === "sam-noun").map(asRaster);
+    for (const { k, fits, cut } of boxes) {
+      const o = byBox.get(k);
       const before = [...nounMasks, ...[...byBox].filter(([j, b]) => j < k && b.source === "sam-box").map(([, b]) => asRaster(b))];
-      expect(o.source === "sam-box").toBe(fits.some((f) => !before.some((a) => clashes(f, a))));
-      if (o.source === "sam-box") expect(before.some((a) => clashes(asRaster(o), a))).toBe(false);
+      const free = fits.some((f) => !before.some((a) => clashes(f, a)));
+      expect(o?.source === "sam-box").toBe(free);
+      if (!free) expect(o === undefined).toBe(cut === null);
+      if (o?.source === "sam-box") expect(before.some((a) => clashes(asRaster(o), a))).toBe(false);
     }
   }
 }

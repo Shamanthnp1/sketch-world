@@ -91,8 +91,21 @@ it("sends one Spark call built by the Worker, replies with the scene and stores 
   expect(logged().includes(KEY)).toBe(false);
 });
 
-it("tells Spark to skip decorations and the ground, sky or background, and to list rainbows (Requirement 3.11)", () => {
-  for (const rule of ["Skip decorations: sparkles", "dots", "texture strokes", "Skip the ground, sky or background itself", 'type "rainbow"']) {
+it("tells Spark to skip decorations, dots and the ground, sky or background, and to list rainbows (Requirement 3.11)", () => {
+  for (const rule of [
+    "Skip decorations: sparkles", "dots", "texture strokes", "Skip the ground, sky or background itself", 'type "rainbow"',
+    "Small dots, specks or scattered marks are texture or decoration even when coloured (e.g. red dots in grass), not flowers or objects",
+    "List a flower only if it has a drawn head",
+  ]) {
+    expect(SCENE_INSTRUCTIONS).toContain(rule);
+  }
+});
+
+it("tells Spark that sky is true for things that swim or float in water and false on the sea floor (Requirement 3.12)", () => {
+  for (const rule of [
+    "sky: true if it is in the sky or swims or floats in water above the ground", "a fish, a turtle, a jellyfish", "a balloon",
+    "false if it rests on the ground or the sea floor (a crab, a starfish, seaweed, coral)",
+  ]) {
     expect(SCENE_INSTRUCTIONS).toContain(rule);
   }
 });

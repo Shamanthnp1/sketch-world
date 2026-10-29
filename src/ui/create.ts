@@ -281,7 +281,7 @@ export function mountCreate(main: HTMLElement): () => void {
       const painted = backdrop(scene.title).catch(() => null).then((png) => (sky.png = png));
       // A failed segment or point call is a miss for its stage (the chain catches it); this only notes the daily cap.
       let capped = false;
-      const io = chainIO(jpeg), miss = (e: unknown): never => { capped ||= isSampleMode(e); throw e; };
+      const io = chainIO(jpeg, () => me === run), miss = (e: unknown): never => { capped ||= isSampleMode(e); throw e; };
       const { instances, notFound } = await buildInstances(scene, px, {
         segment: (p) => io.segment(p).catch(miss), point: (o) => io.point(o).catch(miss),
       });

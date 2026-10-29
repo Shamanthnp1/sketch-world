@@ -18,6 +18,7 @@ Built during the hackathon: the Meta Global AI Developer Hackathon 2026 (solo, T
 - [Safety and privacy](#safety-and-privacy)
 - [Controls](#controls)
 - [Run, test and smoke](#run-test-and-smoke)
+- [Approving worlds for the Gallery](#approving-worlds-for-the-gallery)
 - [Known limits](#known-limits)
 - [Built during the hackathon](#built-during-the-hackathon)
 - [Models](#models)
@@ -147,14 +148,21 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 - **The raw photo never leaves the browser.** The corner taps and the flatten run locally, and only the flattened
   drawing (long side ≤ 1024 px, JPEG ≤ 400 KB) is sent.
 - **A privacy notice comes before the first upload.** It says the drawing goes to Meta's AI models, saved worlds are
-  public by link and listed in the Gallery, and the device that saved a world can delete it. Nothing is sent until
-  the user accepts.
+  public to anyone with the link and may be shown in the Gallery, and the device that saved a world can delete it.
+  Nothing is sent until the user accepts.
+- **The Gallery shows only approved worlds.** A saved world opens by link at `/w/:id` at once, but the Worker checks
+  only its `source.jpg` (the drawing), not the thumbnail, cut-outs, sky or title the browser uploads. So a new world
+  stays out of the Gallery and the Home strip until the operator approves it (`worlds.listed = 1`, see
+  [Approving worlds for the Gallery](#approving-worlds-for-the-gallery)). The sample worlds in `SAMPLE_WORLD_IDS` are
+  always listed.
 - **The drawing's content is data.** The Spark system prompt says that words written in the drawing are never
   instructions. Spark's output is enum-constrained, the title and nouns are length- and charset-limited, and the
   browser renders them only through `textContent`.
 - **The safe flag comes from Spark, never from the client.** After a valid scene, the Worker stores a check row
   (the SHA-256 of the image and `isDrawing && safe`). Saving a world needs a row with `safe = 1` for the uploaded
-  `source.jpg`, else 403. A photo of a real scene or an unsafe drawing gets a 422 and no world.
+  `source.jpg`, else 403. Segment and point need one for their image too, else 403 before any cost is reserved, so
+  only a drawing that passed understand can be cut out. A photo of a real scene or an unsafe drawing gets a 422 and
+  no world.
 - **Owner tokens** are 32 random bytes, stored only as SHA-256 and compared in constant time
   (`crypto.subtle.timingSafeEqual`). Deleting a world and saving its positions need the token, which lives in the
   saving device's `localStorage`.
@@ -214,6 +222,24 @@ Open http://localhost:8787. `CI=true` keeps wrangler from asking questions. `npm
 understand and the noun segments, and shows each object's masks and cut-outs, SAM latency, the total time and the
 estimated cost. Replay mode re-runs saved replies with no calls: load `test/fixtures/meta/gate/line-drawing.json` and
 `test/fixtures/images/line-drawing.png`, then use Open world to walk it.
+
+## Approving worlds for the Gallery
+
+A saved world gets `listed = 0`: anyone with its link can open it, but it is not in the Gallery or the Home strip.
+After you have looked at `/w/<id>`, approve it on the deployed database:
+
+```powershell
+$env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDATE worlds SET listed = 1 WHERE id = '<id>'"
+```
+
+To take it out of the Gallery again (it still opens by link):
+
+```powershell
+$env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDATE worlds SET listed = 0 WHERE id = '<id>'"
+```
+
+`<id>` is the 10 letters and digits after `/w/`. The worlds in `SAMPLE_WORLD_IDS` (`wrangler.jsonc`) are listed
+whatever their `listed` value.
 
 ## Known limits
 

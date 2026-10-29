@@ -6,13 +6,14 @@ Date: 2026-10-29. Reviewer: Kiro, with the `ponytail-review` checklist. Scope: t
 Load assumed: the public hackathon demo on workers.dev. Judges and visitors use it at the same time, some behind a
 shared school, office or mobile carrier IP, and the daily cap is $2 (`DAILY_COST_CAP_USD = "2"`).
 
-Tests: 560 before the fixes, 571 after (56 → 57 files). `npm run typecheck` and `npm run build` are clean before and after.
+Tests: 560 before the fixes, 571 after (56 → 57 files), 577 after findings 4 and 11. `npm run typecheck` and
+`npm run build` are clean before and after. The cap is now $5 (575e643), at the user's decision.
 
 ## What this code does
 
 A browser app turns a drawing into a three.js paper world. A Worker proxies three Meta models behind per-IP rate limits
 and a daily cost cap, and stores saved worlds in D1 (JSON) and R2 (pictures). Anyone can save a world; it is then public
-at `/w/:id` and listed in the Gallery.
+at `/w/:id`, and listed in the Gallery once the operator approves it (since finding 4's fix).
 
 ## Findings
 
@@ -21,14 +22,14 @@ at `/w/:id` and listed in the Gallery.
 | 1 | Medium | Security, load | Chunked uploads to understand, segment and point were parsed whole before any size check | Yes, 84eb6bb |
 | 2 | Medium | Security, cost | Another site could make its visitors' browsers call the model routes | Yes, d356ad6 |
 | 3 | Medium | Security (DoS) | A crafted saved world made every Viewer allocate gigabytes and crash the tab | Yes, 2145242 |
-| 4 | High | Security, content | The public thumbnail, cut-outs, backdrop and title of a saved world are never checked | No: needs a decision |
-| 5 | High | Load, cost | One person can use up the whole day's $2 in 5–8 minutes within the per-IP limits | No: needs a decision |
+| 4 | High | Security, content | The public thumbnail, cut-outs, backdrop and title of a saved world are never checked | Yes, 2ab6a3c (approved-only Gallery) |
+| 5 | High | Load, cost | One person can use up the whole day's $2 in 5–8 minutes within the per-IP limits | No: needs a decision (cap raised to $5 in 575e643) |
 | 6 | Low–Medium | Bug | The Viewer stayed on "Opening this world…" forever when 3D could not start | Yes, d33beea |
 | 7 | Low | Bug, cost | Leaving Create mid-run kept sending the queued model calls | Yes, 76eaea5 |
 | 8 | Low | Security | No `frame-ancestors`: another site could frame the app (clickjacking on Delete world) | Yes, 23a3103 |
 | 9 | Low | Cost | A timed-out model call is retried up to 3 times on one reservation | No: needs a decision |
 | 10 | Low–Medium | Load | Everyone behind one shared IP shares one rate limit | No: needs a decision |
-| 11 | Low | Security | segment and point accept any image, not only a checked drawing | No: needs a decision |
+| 11 | Low | Security | segment and point accept any image, not only a checked drawing | Yes, c2a00e6 |
 | 12 | Nice to have | Lean | Two copies of `parseJson` | No: style |
 | 13 | Nice to have | Load | `GET /api/gallery` has no cache header | No: fine at this load |
 | 14 | Nice to have | Data | The `checks` table only grows | No: fine at this load |
@@ -51,11 +52,12 @@ at `/w/:id` and listed in the Gallery.
    - **Problem:** The Viewer allocates `img.w × img.h × 4` bytes and draws every cut-out on a canvas up to that size, all 30 at once. A save with `img 4096 × 4096` and 30 full-size bboxes asks for about 64 MB + 30 × 128 MB. Only `source.jpg` must pass the safe check, so anyone can make such a world, and it shows in the Gallery.
    - **Fix:** img sides are at most `MAX_IMG_SIDE = 1024`, the Work_Image long side of Requirement 1.3 (the pad is 1024 × 768, `workImage` scales to 1024). Every crop is clamped to img, so the Viewer's memory is now bounded like a real world's. Test: a 4096 × 4096 save → 400 and nothing written. Property 10's generator now draws img sides up to 1024; it passes.
 
-4. **Saved worlds publish pictures and titles that nothing checks** (`worker/routes/worlds.ts`) — not fixed, needs a decision
+4. **Saved worlds publish pictures and titles that nothing checks** (`worker/routes/worlds.ts`, `gallery.ts`) — fixed in 2ab6a3c
    - **What this is:** A save needs a `checks` row with `safe = 1` for the SHA-256 of `source.jpg`, which only `/api/understand` writes.
    - **Problem:** That proves only that `source.jpg` is a safe drawing. `thumb.jpg`, the cut-out PNGs, `backdrop.jpg` and the title are whatever the client sends. Someone can save a checked drawing with any picture as its thumbnail, and that picture shows on Home's gallery strip and the Gallery for every visitor.
    - **Options:** (a) new worlds stay out of the Gallery (`safe = 0` or a `listed` column) until the operator approves them, and the Gallery shows the sample worlds; (b) one more Spark safety call on `thumb.jpg` per save ($0.01; misses the cut-outs); (c) keep it, and remove bad worlds by hand with `UPDATE worlds SET safe = 0 WHERE id = ?` on `sketch-world-db` (the Viewer and Gallery then hide the world).
    - **Recommendation:** (a) for the judging period if judges will browse the Gallery; otherwise (c), with that command written down.
+   - **Fix (option a, the user's decision):** `migrations/0002_listed.sql` adds `worlds.listed INTEGER NOT NULL DEFAULT 0`, rebuilds `worlds_gallery` as `(safe, listed, created_at DESC)` and sets `listed = 1` on the three sample worlds. A save stores `listed = 0` and still opens by link at once (`getWorld` is unchanged). `GET /api/gallery` reads `safe = 1 AND listed = 1` (one index range, at most 24 rows) and merges in the `SAMPLE_WORLD_IDS` worlds whatever their column says, so a re-made sample shows without a D1 update. The operator approves a world with `UPDATE worlds SET listed = 1 WHERE id = '<id>'` and hides it with `listed = 0` (README "Approving worlds for the Gallery"). The privacy notice now says saved worlds are public by link and may be shown in the Gallery (`PRIVACY_KEY` v2, so it shows again); the Gallery, Home strip and Share texts say worlds appear once approved. Tests: an unlisted world is out of the gallery but readable by id, then in after the approve command; samples with `listed = 0` are in; the gallery tests seed `listed = 1`. The deploy must run the remote migration before `wrangler deploy`.
 
 5. **One person can use up the day's budget in minutes** (`wrangler.jsonc`, `worker/limits/rate.ts`, `worker/cost.ts`) — not fixed, needs a decision
    - **What this is:** Each IP may call understand 6, point 6, segment 30 and backdrop 6 times a minute; the daily cap is $2.
@@ -91,11 +93,12 @@ at `/w/:id` and listed in the Gallery.
     - **Problem:** A class or office behind one NAT, or a mobile carrier's shared IP, shares them. One world uses 6–16 segment calls, so that group can make only 2–5 worlds a minute. A busy group sees "try again in a minute" on understand, and objects "not found" when SamClient gives up after its 3 retries.
     - **Recommendation:** keep the limits while the cap is $2 (finding 5 matters more). If you raise the cap for judging, raise `RL_SEGMENT` to 60 with it.
 
-11. **segment and point accept any image** (`worker/routes/segment.ts`, `point.ts`) — not fixed, needs a decision
+11. **segment and point accept any image** (`worker/routes/segment.ts`, `point.ts`) — fixed in c2a00e6
     - **What this is:** Only understand checks that a picture is a safe drawing.
     - **Problem:** Anyone can send a photo of a real person straight to `/api/segment` or `/api/point`, which understand would refuse. The cap still applies.
     - **Option:** require a `checks` row with `safe = 1` for the SHA-256 of the image on both routes; the browser already sends the same JPEG bytes it sent to understand. This costs one D1 read per call (about 17 per world).
     - **Recommendation:** do it if you want the refusal of Requirement 3.9 to hold on every route. It is not in the requirements, so it waits for you.
+    - **Fix (the user's decision, now Requirement 12.9):** `checkedSafe(env, bytes)` in `worker/routes/understand.ts` looks up the `checks` row for `sha256Hex(bytes)`, the same hash understand writes and save reads. Both routes call it after their input caps (413, 400, 415) and before `reserveCall`; without a row with `safe = 1` they reply 403 `{error: "Only drawings checked by this app can be cut out"}` with no reservation and no model call. The browser sends the same bytes: Create and the probe's Live mode pass one Work_Image JPEG `Blob` (from `workImage`) to `understand`, then to `chainIO` (`SamClient.segment` and `point`) or `SamClient.segment`, each appended unchanged to a `FormData`. Nothing calls segment or point without a successful understand first (a 502 from understand gives the Minimal_Scene, which makes no cut-out calls). Tests: an unchecked image and a `safe = 0` image on each route → 403, no fetch, the day's `usage` unchanged; the segment, point, cost and rate tests seed the row.
 
 ### Nice to have (left as is)
 
@@ -121,7 +124,7 @@ at `/w/:id` and listed in the Gallery.
 
 ## Verdict
 
-Fix 4 and 5 first: both need your decision. Findings 1, 2, 3, 6, 7 and 8 are fixed.
+Findings 1, 2, 3, 4, 6, 7, 8 and 11 are fixed. For finding 5 the cap is now $5 (575e643); the rest of it still needs your decision.
 
 Lean: −14 lines possible (finding 12).
 

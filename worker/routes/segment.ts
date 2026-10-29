@@ -5,7 +5,7 @@ import { buildObjectPrompt } from "@meta-sam/parser";
 import { reserveCall } from "../cost";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
-import { MAX_IMAGE_BYTES, readBox, readImage, readNoun } from "../limits/input";
+import { MAX_IMAGE_BYTES, readBox, readForm, readImage, readNoun } from "../limits/input";
 import { metaFetch } from "../meta/metaFetch";
 import { base64, outputText } from "../meta/reply";
 
@@ -13,9 +13,8 @@ import { base64, outputText } from "../meta/reply";
 const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 16 * 1024;
 
 export async function segment(req: Request, env: Env): Promise<Response> {
-  if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) return jsonError(413, "Request body is too large");
-  const form = await req.formData().catch(() => null);
-  if (!form) return jsonError(400, "Expected a multipart/form-data body");
+  const form = await readForm(req, MAX_BODY_BYTES);
+  if (form instanceof Response) return form;
   const image = await readImage(form, "image");
   if (image instanceof Response) return image;
 

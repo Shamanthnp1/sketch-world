@@ -10,7 +10,7 @@ import { MovesBody, movesValid, SavedScene, type WorldReply } from "../../shared
 import { randomId, randomToken, sha256Hex, WORLD_ID } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo, type ImageInfo } from "../limits/imageSize";
-import { MAX_CUT_PNG_BYTES, MAX_IMAGE_BYTES, parseJson, readBody, readJsonField } from "../limits/input";
+import { MAX_CUT_PNG_BYTES, MAX_IMAGE_BYTES, parseJson, readBody, readForm, readJsonField } from "../limits/input";
 
 const MAX_SCENE_BYTES = 64 * 1024;
 const MAX_THUMB_BYTES = 100 * 1024;
@@ -23,11 +23,8 @@ type Spec = { key: string; cap: number; type: ImageInfo["type"] };
 type Upload = { key: string; bytes: Uint8Array; info: ImageInfo };
 
 export async function saveWorld(req: Request, env: Env): Promise<Response> {
-  // Bounded read: a chunked body has no Content-Length to check.
-  const body = await readBody(req, MAX_BODY_BYTES);
-  if (body instanceof Response) return body;
-  const form = await new Response(body, { headers: { "Content-Type": req.headers.get("Content-Type") ?? "" } }).formData().catch(() => null);
-  if (!form) return jsonError(400, "Expected a multipart/form-data body");
+  const form = await readForm(req, MAX_BODY_BYTES);
+  if (form instanceof Response) return form;
 
   const raw = readJsonField(form, "scene", MAX_SCENE_BYTES);
   if (raw instanceof Response) return raw;

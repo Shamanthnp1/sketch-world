@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { exports } from "cloudflare:workers";
+import { describe, expect, it, vi } from "vitest";
 import { MAX_IMAGE_BYTES, readBox, readImage, readJsonField, readNoun, readText } from "../../worker/limits/input";
 
 const JPEG = [0xff, 0xd8, 0xff, 0xe0];
@@ -121,5 +122,22 @@ describe("readBox", () => {
   });
   it("returns 400 when missing", () => {
     expect(status(readBox(form({})))).toBe(400);
+  });
+});
+
+describe("readForm in the multipart model routes", () => {
+  // A chunked body has no Content-Length, so only counting its bytes can refuse it before formData() parses it whole.
+  it.each(["/api/understand", "/api/segment", "/api/point"])("POST %s refuses a streamed body over its cap with 413 and no model call", async (path) => {
+    const fetch = vi.spyOn(globalThis, "fetch");
+    const body = new Blob([new Uint8Array(MAX_IMAGE_BYTES + 17 * 1024)]).stream();    // the 400 KB image cap + 16 KB framing, plus 1 KB
+    const req = new Request(`https://example.com${path}`, { method: "POST", body, headers: { "Content-Type": "multipart/form-data; boundary=x" } });
+    expect(req.headers.get("Content-Length")).toBeNull();
+
+    const res = await exports.default.fetch(req);
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "Request body is too large" });
+    expect(fetch).not.toHaveBeenCalled();
+    fetch.mockRestore();
   });
 });

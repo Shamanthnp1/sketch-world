@@ -57,6 +57,15 @@ export async function readBody(req: Request, capBytes: number): Promise<Uint8Arr
   return new Uint8Array(await new Blob(chunks).arrayBuffer());
 }
 
+// The multipart body as FormData, read through readBody: a body over capBytes → 413 before it is parsed, also when it
+// is chunked and has no Content-Length. Not multipart/form-data → 400.
+export async function readForm(req: Request, capBytes: number): Promise<FormData | Response> {
+  const body = await readBody(req, capBytes);
+  if (body instanceof Response) return body;
+  const form = await new Response(body, { headers: { "Content-Type": req.headers.get("Content-Type") ?? "" } }).formData().catch(() => null);
+  return form ?? jsonError(400, "Expected a multipart/form-data body");
+}
+
 // UTF-8 JSON bytes → the parsed value unchecked (the caller validates it with zod); undefined if not JSON.
 export function parseJson(bytes: Uint8Array): unknown {
   try {

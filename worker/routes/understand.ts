@@ -5,7 +5,7 @@ import { reserveCall } from "../cost";
 import { sha256Hex } from "../crypto";
 import { jsonError } from "../http";
 import { imageInfo } from "../limits/imageSize";
-import { MAX_IMAGE_BYTES, readImage } from "../limits/input";
+import { MAX_IMAGE_BYTES, readForm, readImage } from "../limits/input";
 import { askScene } from "../meta/spark";
 
 // The image plus multipart framing; a larger body is refused before parsing.
@@ -14,9 +14,8 @@ const ATTEMPTS = 2;    // one retry when the reply is not a valid scene
 export const NOT_A_DRAWING = "Please use a drawing; photos of real people aren't supported";
 
 export async function understand(req: Request, env: Env): Promise<Response> {
-  if (Number(req.headers.get("Content-Length")) > MAX_BODY_BYTES) return jsonError(413, "Request body is too large");
-  const form = await req.formData().catch(() => null);
-  if (!form) return jsonError(400, "Expected a multipart/form-data body");
+  const form = await readForm(req, MAX_BODY_BYTES);
+  if (form instanceof Response) return form;
   const image = await readImage(form, "image");
   if (image instanceof Response) return image;
 

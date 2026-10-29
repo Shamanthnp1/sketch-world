@@ -108,7 +108,12 @@ export function mountViewer(main: HTMLElement, id: string): () => void {
       // The sky is not worth failing for: without it the gradient shows (Requirement 9.6).
       const painted = reply.assets.backdrop ? bitmap(reply.assets.backdrop).catch(() => undefined) : undefined;
       [parts, sky] = await Promise.all([rebuild(reply), painted]);
+      if (left) return sky?.close();
+      // Inside the try: without WebGL (or past the browser's context limit) three.js throws here, and the page would
+      // otherwise stay on "Opening this world…".
+      await open(reply, parts, sky);
     } catch (e) {
+      close?.();    // a world that half opened goes, and the site header and footer come back
       if (left) return;
       if (e instanceof ApiError && e.status === 404) {
         document.title = "World not found · Sketch World";
@@ -119,10 +124,7 @@ export function mountViewer(main: HTMLElement, id: string): () => void {
         main.querySelector("button")!.addEventListener("click", () => { void load(); main.focus(); }); // the button is gone: keep focus in main
       }
       main.querySelector<HTMLElement>("h1")!.focus();
-      return;
     }
-    if (left) return sky?.close();
-    await open(reply, parts, sky);
   }
 
   async function open(reply: WorldReply, { work, instances }: Awaited<ReturnType<typeof rebuild>>, sky?: ImageBitmap): Promise<void> {

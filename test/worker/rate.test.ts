@@ -5,7 +5,8 @@ import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { SavedScene } from "../../shared/saved";
 import { randomId, randomToken, sha256Hex } from "../../worker/crypto";
-import { LIMITERS, NO_IP, type LimitedRoute } from "../../worker/limits/rate";
+import { NO_IP } from "../../worker/limits/client";
+import { LIMITERS, type LimitedRoute } from "../../worker/limits/rate";
 import { call, jpg, png } from "./helpers";
 
 const IP = "203.0.113.7";
@@ -110,6 +111,16 @@ it.each<[string, LimitedRoute, string, string, number]>([
   expect(res.status).toBe(status);
   expect(res.headers.get("Retry-After")).toBeNull();
   expect(limits[LIMITERS[route]]).toHaveBeenCalledExactlyOnceWith({ key: `${route}:${NO_IP}` });
+});
+
+it("keys an IPv6 client by its /64, so every address in it shares one limit", async () => {
+  const limits = spyLimits(true);
+
+  for (const ip of ["2001:DB8:1:2::7", "2001:db8:1:2:aaaa:bbbb:cccc:dddd"]) {
+    await (await exports.default.fetch(req("POST", "/api/segment", "x", { "CF-Connecting-IP": ip }))).body?.cancel();
+  }
+
+  expect(limits.RL_SEGMENT!.mock.calls).toEqual([[{ key: "segment:2001:db8:1:2::/64" }], [{ key: "segment:2001:db8:1:2::/64" }]]);
 });
 
 it("passes the real local limiter's success through to the handler", async () => {

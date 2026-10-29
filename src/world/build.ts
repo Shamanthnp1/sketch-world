@@ -1,6 +1,6 @@
 // The three.js World_View: paper Cards at their layout positions, one requestAnimationFrame loop for motion and
-// effects, tap → label + bounce, and moving Cards by drag (design.md "Browser components", "motion", "placeDrag",
-// Requirements 7.1–7.3, 8.2, 8.3, 12.4, 14.1, 14.8, 15.1–15.11). Load it only through open.ts (dynamic import), so
+// effects, the intro pop-up, tap → label + bounce, and moving Cards by drag (design.md "Browser components", "motion",
+// "placeDrag", Requirements 7.1–7.3, 8.2–8.4, 12.4, 14.1, 14.8, 15.1–15.11). Load it only through open.ts (dynamic import), so
 // three.js stays out of the first page load. Walking (walk.ts) and the HUD (ui/hud.ts) plug in through World; the sky
 // is Muse Image's panorama (setSky) or a gradient from the ground colour (Requirements 9.6, 9.7).
 import {
@@ -18,7 +18,7 @@ import { SPAWN, WORLD_BOUNDS, walkCircles } from "./collide";
 import { placeDrag } from "./drag";
 import { KRAFT, meanColour, skyColours } from "./ground";
 import { layout, type Placed } from "./layout";
-import { foldAmount } from "./popup";
+import { foldAmount, introFold, introLean, introOrder } from "./popup";
 import { SKY_R, type Vec3 } from "./space";
 import "./world.css";
 
@@ -153,7 +153,7 @@ export interface Card {
   id: number; kind: Placed["kind"]; type: ObjType; label: string;
   placed: Placed;   // the layout result: home position, size, collision circle
   pos: Vec3;        // current home; drags and Reset positions (6.12) set it, motion offsets are added on top
-  fold: number;     // 0 flat … 1 upright, used by upright Cards only; walk (6.7) raises it with foldAmount each frame
+  fold: number;     // 0 flat … 1 upright, used by upright Cards only; walk (6.7) raises it with foldAmount and the frame loop with introFold
   still: boolean;   // true pauses this Card's motion (while it is dragged)
   mesh: Mesh;       // origin at the base centre (upright, float, terrain) or the centre (flat, sky)
 }
@@ -190,6 +190,7 @@ interface Live extends Card {
   w: number;     // motion weight 0…1: 0 while still, fades back in after a drop
   lift: number;  // 0 resting … 1 picked up
   off: Vec3;     // this frame's motion offset, so a drag starts from where the Card shows
+  popped: boolean; // the intro, not the player's distance, raised this upright Card, so it leans with the intro's spring
 }
 
 /** One press on the canvas, from pointerdown to pointerup (one at a time). */
@@ -277,7 +278,7 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
     const c: Live = {
       id: p.id, kind: p.kind, type: o.type, label: labels.get(p.id)!, placed: p, pos: { x: p.x, y: p.y, z: p.z },
       fold: p.kind === "upright" ? foldAmount(0, Math.hypot(p.x - SPAWN.x, p.z - SPAWN.z), reducedMotion) : 1,
-      still: false, mesh, bounceAt: -Infinity, canvas: art.canvas, w: 1, lift: 0, off: { ...ORIGIN },
+      still: false, mesh, bounceAt: -Infinity, canvas: art.canvas, w: 1, lift: 0, off: { ...ORIGIN }, popped: false,
     };
     if (p.kind === "upright" || p.kind === "float") scene.add(c.shadow = new Mesh(shadowGeo, shadowMat));
     if (o.type === "sun") {
@@ -290,13 +291,27 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
   let paused = false, raf = 0, hideLabel = 0, last = performance.now(), selected: Live | null = null;
   const t0 = last, clock = () => (performance.now() - t0) / 1000;
   const hooks = new Set<(t: number, dt: number) => void>();
+  // The intro pop-up (popup.ts): its clock sums the capped frame times, so a slow first frame skips none of it, and each
+  // upright Card's turn is set at the first frame, nearest to the camera first (walk has put it on the player by then,
+  // and the Viewer's saved moves are in).
+  const ups = cards.filter((c) => c.kind === "upright");
+  let introT = 0, turns: Map<Live, number> | null = null;
 
   const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
     const t = (now - t0) / 1000, dt = Math.min(0.1, Math.max(0, now - last) / 1000), still = reducedMotion || paused;
     last = now;
     for (const cb of hooks) cb(t, dt);
+    introT += dt;
+    turns ??= new Map(introOrder(ups.map((c) => c.pos), { x: camera.position.x, z: camera.position.z }).map((k, i) => [ups[i]!, k]));
     for (const c of cards) {
+      let lean = 0;
+      if (c.kind === "upright") { // after walk's foldAmount: the fold is max(foldAmount, introFold), so it never lowers
+        const k = turns.get(c)!, f = introFold(k, ups.length, introT, reducedMotion);
+        c.popped ||= f > c.fold;
+        c.fold = Math.max(c.fold, f);
+        if (c.popped) lean = introLean(k, ups.length, introT, reducedMotion);
+      }
       const m = motion(c.kind, c.type, c.id, t, still || c.still), e = effect(c.type, c.id, t, still);
       c.w = still || c.still ? 0 : Math.min(1, c.w + dt / RESUME_S); // stops at once, fades back in
       c.lift = reducedMotion ? +c.still : c.lift + (+c.still - c.lift) * Math.min(1, dt * LIFT_RATE);
@@ -304,7 +319,7 @@ export function buildWorld(host: HTMLElement, opts: WorldOptions): World {
       const x = c.pos.x + c.off.x, z = c.pos.z + c.off.z, sky = c.kind === "sky", s = sky ? 1 + SKY_LIFT * c.lift : 1;
       c.mesh.position.set(x, c.pos.y + c.w * m.dy + bounce(t - c.bounceAt) + (sky ? 0 : LIFT_H * c.lift), z);
       if (sky) c.mesh.lookAt(0, 0, 0); // faces the origin wherever it was dragged
-      else if (c.kind !== "flat") c.mesh.rotation.set(-(1 - c.fold) * Math.PI / 2, 0, c.w * m.rotZ); // top folds away from the player
+      else if (c.kind !== "flat") c.mesh.rotation.set(-(1 - c.fold - lean) * Math.PI / 2, 0, c.w * m.rotZ); // top folds away from the player
       c.mesh.scale.set(m.flip ? -s : s, s, s);
       const mat = c.mesh.material as MeshBasicMaterial;
       mat.color.setHex(c === selected ? ACCENT_HEX : WHITE);

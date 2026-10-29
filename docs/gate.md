@@ -243,3 +243,45 @@ $env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDA
 **Per-visitor budget and timeout re-reservation (review findings 5 and 9).** `PER_IP_DAILY_USD` = `"0.5"`: each client (an IPv4 address or an IPv6 /64) may spend at most $0.50 per UTC day, tracked in the `usage_ip` table of `migrations/0003_usage_ip.sql`. Over it the Worker replies 503 `{mode: "sample", reason: "visitor"}`. A model call that timed out is reserved again before its retry. The same `migrations apply ... --remote` step applies 0003 after 0002; `wrangler deploy` must come after it, since every model call now writes `usage_ip`.
 
 **Safe gate on segment and point (review finding 11).** Both routes now need a `checks` row with `safe = 1` for the SHA-256 of their image, the row `/api/understand` writes. Without one they reply 403 "Only drawings checked by this app can be cut out", after the input caps and before any cost is reserved. Create and the probe's Live mode send the same Work_Image JPEG `Blob` to understand, segment and point, so a normal run is unchanged.
+
+## Checkpoint deploy (task 12)
+
+Date: 2026-10-29. Part 1 of 2, approved by the user: deploy the checkpoint fixes and make sample worlds 1 (`1.jpeg`) and 3 (`ms2.png`) again on the live site.
+
+Version id **`425dc088-d083-4296-8c92-f7e1b16f5fe3`**, deployed with wrangler 4.153.0 by `npx wrangler deploy --secrets-file .dev.vars` from commit `d0eee5c` (clean tree; 622 tests, typecheck and build clean). `wrangler whoami` showed account b48bb45c…f753, and `.dev.vars` holds only `MODEL_API_KEY`. The deploy uploaded 13 new or changed assets of 29 and listed the same bindings as before, with `DAILY_COST_CAP_USD` `"5"`, `PER_IP_DAILY_USD` `"0.5"` and `SAMPLE_WORLD_IDS` unchanged; `wrangler secret list` shows `MODEL_API_KEY` as `secret_text`. No other resource was touched.
+
+**Migrations**, applied before the deploy with `npx wrangler d1 migrations apply sketch-world-db --remote`: `0002_listed.sql` (5 commands), then `0003_usage_ip.sql` (2 commands), both ✅. Afterwards `SELECT id, listed FROM worlds` returned the 3 samples with `listed = 1`, and `sqlite_master` has `usage_ip` and the rebuilt `worlds_gallery`.
+
+**Smoke**, no model calls (the day's `usage` and `usage_ip` rows were still absent afterwards):
+
+| Request | Result |
+|---|---|
+| `HEAD /` | 200 `text/html`, `content-security-policy: default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'`, `x-content-type-options: nosniff` |
+| `GET /api/gallery` | 200, the 3 sample worlds in `worlds` and in `samples` |
+| `POST /api/understand` with `Origin: https://example.com` (a 1 × 1 PNG) | 403 `{"error":"Requests from other sites are not allowed"}` |
+| `POST /api/segment` with no Origin, a 1 × 1 PNG with no checks row and `noun=fish` | 403 `{"error":"Only drawings checked by this app can be cut out"}` |
+
+**New sample worlds.** Each drawing was run once on the deployed site through the normal Create flow ("Photo of a drawing", privacy notice accepted, "Use the whole photo"), in `playwright-cli` headless Chrome at 1280 × 800, then saved with Save & share. Every model call replied 200 on attempt 1. The owner tokens are added to the gitignored `test/fixtures/drawings/private/sample-owners.json`, next to the old ones. Both new worlds have `listed = 0`; the Gallery will list them once they are in `SAMPLE_WORLD_IDS`.
+
+| World | Drawing | Title | Objects | Calls | Est. cost | World open | Sky |
+|---|---|---|---|---|---|---|---|
+| [wLeiDFftn0](https://sketch-world.shamanthnp.workers.dev/w/wLeiDFftn0) | 1.jpeg | Underwater Sea Friends | 7: fish ×2, turtle, crab, starfish, seaweed, coral | understand, 6 noun + 1 box segment, point, backdrop | $0.0475 | ≈ 16.5 s | 18.7 s |
+| [3gQJnD3lHP](https://sketch-world.shamanthnp.workers.dev/w/3gQJnD3lHP) | ms2.png | Sunny Valley with River | 15: sun, cloud ×4, bird ×5, mountain ×2, tree, house, river | understand, 7 noun segments, backdrop | $0.0375 | 12.5 s | 19.2 s |
+
+Times run from Use the whole photo to the open world and to the backdrop reply; saving took 2.9 s and 2.5 s.
+
+- **1.jpeg**: both fish and the turtle now have sky true and float in the water, with their shadows on the sand below. The crab, starfish, seaweed and coral have sky false and stand on the sand. Seaweed again got 0 noun masks and was cut by the point call plus one box SAM call. Spark listed the same 7 objects as at task 11.3 (rocks and the small shell still missing).
+- **ms2.png**: no flower and no field listed, so no point or box calls. All 15 cards are noun cut-outs, with no green squares and no dot cut-outs. The world opened 24 s sooner than at task 11.3 (36.8 s) and cost $0.0225 less ($0.06). The front mountain still has its tree-shaped hole with a small dark-green fleck inside it, part of its noun mask, as in the old world. The tree stands close to the spawn point on the left, so it is out of the opening view once it has popped up. A few red grass dots show at the foot of its trunk, inside the tree's mask.
+
+**Cost rows.** Before the two runs, the remote `usage` table had no row for 2026-10-29 and `usage_ip` was empty. Afterwards, `usage` for 2026-10-29 is 85,000 µ$ and `usage_ip` has one row for the day at 85,000 µ$ (client column not read). Both grew by the same total, which equals $0.0475 + $0.0375, so there were no hidden retries. A `wrangler tail` (pretty format) ran through both runs: 19 model calls, all attempt 1, and no "reserve counted one total only" warning.
+
+**Non-owner check**, in a fresh `playwright-cli` session (in-memory profile, no `owner:*` keys) at 1280 × 800:
+
+| World | Cut-outs | Sky | Pop-up intro | Controls | Model or save requests | Console errors |
+|---|---|---|---|---|---|---|
+| wLeiDFftn0 | 7 PNGs, all 200 | `backdrop.jpg` 200 | the crab and starfish still rising 150 ms after the canvas appears | Objects, Pause motion, Reset positions, Help, Share link, Make your own; no Save positions or Delete world | 0 | 0 |
+| 3gQJnD3lHP | 15 PNGs, all 200 | `backdrop.jpg` 200 | the house and tree still rising | the same | 0 | 0 |
+
+Spend: **$0.085** (2 understand, 1 point, 14 SAM and 2 backdrop calls at the design.md fixed estimates; matches the `usage` row). Live spend including the gate, its re-check, the task 11.3 sample worlds and the task 12 local check: **$0.4725**.
+
+**Part 2** (a later run) will delete the old worlds `NjaZ1IphRu` and `VcULvxRZQO` with their owner tokens and set `SAMPLE_WORLD_IDS` to `wLeiDFftn0,Tco7s8pREl,3gQJnD3lHP`, then deploy again and push. Until then the Gallery and Home still show the old three.

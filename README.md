@@ -161,7 +161,7 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 - **Rate limits** per IP per 60 s: 6 for understand, point, backdrop and saving; 30 for segment. Over the limit the
   Worker replies 429 with `Retry-After`. Size, type and field caps reply 400, 413 or 415.
 - **Daily cost cap:** each model call first reserves its estimate in one conditional D1 update. On the deployed site
-  the cap is $2 per UTC day. When it is reached, the Worker skips the call and replies 503 `{mode: "sample"}`, and the
+  the cap is $5 per UTC day (raised from $2 for judging week). When it is reached, the Worker skips the call and replies 503 `{mode: "sample"}`, and the
   Create page shows Sample_Mode ("No more new worlds today") with links to the sample worlds and the Gallery, which
   keep working.
 - **Headers:** a CSP of `default-src 'self'; img-src 'self' blob: data:; connect-src 'self'` and

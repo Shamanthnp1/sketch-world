@@ -130,7 +130,7 @@ Before creating anything, the shared account (b48bb45c…f753) had D1 `undo-manu
 | D1 | `sketch-world-db` | id `0f1a2aeb-08bd-431b-b6ce-eed4db5af212`, region APAC; `0001_init.sql` applied remotely (tables `worlds`, `usage`, `checks`) |
 | R2 | `sketch-world-assets` | Standard storage class, empty |
 | Rate limits | `RL_UNDERSTAND` 74031, `RL_POINT` 74032, `RL_SEGMENT` 74033, `RL_BACKDROP` 74034, `RL_SAVE` 74035 | 6/60 s each, `RL_SEGMENT` 30/60 s; no namespace conflict reported |
-| Var | `DAILY_COST_CAP_USD` = `"2"` | **$2 per UTC day** (lowered from $5 at the user's request), about 40–57 worlds a day at the design.md estimate of $0.035–0.05 each |
+| Var | `DAILY_COST_CAP_USD` = `"2"` | **$2 per UTC day** (lowered from $5 at the user's request), about 40–57 worlds a day at the design.md estimate of $0.035–0.05 each. Raised to `"5"` for judging week at the task 12 review (see "Review decisions" below) |
 | Var | `SAMPLE_WORLD_IDS` = `""` | Set in task 11.3 |
 | Secret | `MODEL_API_KEY` | `wrangler secret list` shows it by name, type `secret_text` |
 
@@ -219,3 +219,9 @@ On these drawings the trimming only changes the dropped dots: every kept sam-box
 | 1.jpeg | fish ×2 and sea turtle with sky true; crab, starfish, seaweed, coral with sky false | fish and turtle sky false | 7.0 s |
 
 One run per drawing, so this can't separate the prompt change from run-to-run variance. The local D1 had no tables (its database id changed at deploy), so the first two requests got a 500 before any model call; `wrangler d1 migrations apply sketch-world-db --local` fixed that. Both Spark calls succeeded on attempt 1. Spend: **$0.02** (local `usage` row 20,000 µ$). Live spend including the gate, its re-check and the sample worlds: **$0.3875**. Not deployed; the saved sample worlds keep their old cards until they are made again.
+
+## Review decisions (task 12)
+
+Date: 2026-10-29. The user's decisions on the core review (`docs/review.md`). Not deployed yet.
+
+**Daily cap: $5.** `DAILY_COST_CAP_USD` = `"5"` in `wrangler.jsonc`, raised from `"2"` for judging week. At the design.md estimate of $0.035–0.05 per world that is about 100–140 worlds a day.

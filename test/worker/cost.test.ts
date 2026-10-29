@@ -41,7 +41,7 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 it("uses DAILY_COST_CAP_USD × 10⁶ µ$ as the cap, and the fixed estimates from design.md", () => {
-  expect(CAP).toBe(2_000_000);    // wrangler.jsonc: "2"
+  expect(CAP).toBe(5_000_000);    // wrangler.jsonc: "5", raised from "2" for judging week
   expect(COST_MICRO).toEqual({ spark: 10_000, sam: 2_500, image: 10_000 });
 });
 

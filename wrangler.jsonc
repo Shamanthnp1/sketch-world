@@ -38,9 +38,9 @@
     // Each client (an IPv4 address, an IPv6 /64) may spend at most $0.50 of the day's cap (10–14 worlds), so one
     // person cannot use up everyone's budget (docs/review.md finding 5). The code falls back to $0.50 the same way.
     "PER_IP_DAILY_USD": "0.5",
-    // Sample worlds from gate drawings 1.jpeg and ms2.png (re-made at task 12) and ms1.png (task 11.3). The first is
-    // Home's "Walk a sample world".
-    "SAMPLE_WORLD_IDS": "wLeiDFftn0,Tco7s8pREl,3gQJnD3lHP"
+    // Sample worlds from examples/drawings/2.jpeg, 3.jpeg and ms1.png (the last from gate drawing ms1.png, padded).
+    // The first (3.jpeg) is Home's "Walk a sample world".
+    "SAMPLE_WORLD_IDS": "TyvjYUpV22,1KFuQknI34,Tco7s8pREl"
   },
   // Value comes from .dev.vars locally and `wrangler deploy --secrets-file .dev.vars` when deployed.
   "secrets": { "required": ["MODEL_API_KEY"] }

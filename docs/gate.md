@@ -309,3 +309,40 @@ Version id **`65a3f380-69e5-4812-919a-bea7d0ad9c2f`**, deployed with wrangler 4.
 | `/w/NjaZ1IphRu` | "This world isn’t here" and "It may have been deleted, or the link is mistyped.", no canvas; its `GET /api/worlds/NjaZ1IphRu` was 404 |
 
 Console: one error, the browser's "Failed to load resource" for that expected 404; no page errors. Spend: $0. Live spend stays **$0.4725**.
+
+## Sample worlds from the example drawings (task 11.3, re-opened)
+
+Date: 2026-11-01. Approved by the user: make sample worlds from the published `examples/drawings/2.jpeg` and `3.jpeg`, delete the 1.jpeg and ms2 sample worlds, point `SAMPLE_WORLD_IDS` at the new set and redeploy.
+
+**New worlds.** Each drawing was run once on the deployed site through the normal Create flow ("Photo of a drawing", privacy notice accepted, "Use the whole photo"), in `playwright-cli` headless Chrome at 1280 × 800, then saved with Save & share (2.4 s and 2.9 s). The file was set on the hidden file input, so no file chooser opened. Every model call replied 200. The owner tokens are in the gitignored `sample-owners.json`.
+
+| World | Drawing | Title | Objects | Calls | Est. cost | World open | Sky |
+|---|---|---|---|---|---|---|---|
+| [TyvjYUpV22](https://sketch-world.shamanthnp.workers.dev/w/TyvjYUpV22) | 3.jpeg | Cozy house with garden | 20: house, tree, pine tree, cloud ×6, sun, rainbow, bush ×2, flower, fence, mushroom ×2, campfire, log ×2 | understand, 12 noun + 2 box segments, point, backdrop | $0.065 | 19.7 s | 19.1 s |
+| [1KFuQknI34](https://sketch-world.shamanthnp.workers.dev/w/1KFuQknI34) | 2.jpeg | House with tree and rainbow | 12: house, tree, bush ×2, sun, rainbow, cloud ×6 | understand, 6 noun segments, backdrop | $0.035 | 10.0 s | 19.0 s |
+
+Times run from Use the whole photo to the open world and to the backdrop reply.
+
+- **3.jpeg**: the rainbow is listed and cut whole. As at the gate, "bush" got 0 noun masks and "cloud" took both bushes, so "cloud 5" and "cloud 6" are the bushes, floating as sky cards above the fence. The point and box stage then cut them again on the ground. Bush 1 is a threshold cut-out showing the top two-thirds of the bush. Bush 2 is a box SAM mask of scattered specks (192 opaque px in a 55 × 31 crop), which show as small white flecks in front of the stump. "log ×2" are the log and the stump. The campfire and the long log stand just in front of the start and look blocky up close (the Work_Image is 740 × 725).
+- **2.jpeg**: all 12 cut-outs are noun masks, with no dots or squares, and the rainbow is whole. The house stands just in front of the start, so its wall and door fill the opening view and the Gallery thumbnail. The bounds allow only 0.5 units of stepping back.
+
+**Old worlds deleted** with `DELETE /api/worlds/<id>`, the owner token and no Origin header: `wLeiDFftn0` (1.jpeg, "Underwater Sea Friends") and `3gQJnD3lHP` (ms2.png, "Sunny Valley with River"), 204 each. Afterwards `GET /api/worlds/<id>`, `thumb.jpg`, `source.jpg`, `backdrop.jpg` and `cut/0.png` all reply 404 for both. Their entries are removed from `sample-owners.json`, which now holds `Tco7s8pREl`, `TyvjYUpV22` and `1KFuQknI34`.
+
+**`SAMPLE_WORLD_IDS`** = `"TyvjYUpV22,1KFuQknI34,Tco7s8pREl"`. The 3.jpeg world is first, so Home's "Walk a sample world" opens it. Its opening view already shows the house, tree, fence, stump, a bush, a mushroom, the campfire and the log, and a slight look up adds the rainbow and the sun. The 2.jpeg world opens on a wall. In the ms1 world the house and trees lie flat until you walk in.
+
+Version id **`c0a3e1aa-59c0-4811-9912-167ff4858e55`**, deployed with wrangler 4.153.0 by `npx wrangler deploy --secrets-file .dev.vars` from `89b095b` plus the `wrangler.jsonc` change committed with this note (622 tests, typecheck and build clean). Same account (b48bb45c…f753); `.dev.vars` holds only `MODEL_API_KEY`, and `wrangler secret list` shows it as `secret_text`. No asset changed (29 files read, none uploaded). The bindings are unchanged except `SAMPLE_WORLD_IDS`. No migrations. No other resource was touched.
+
+**Smoke**, no model calls. The browser run aborted any model request or non-GET `/api/worlds` request, and none was made.
+
+| Check | Result |
+|---|---|
+| `GET /api/gallery` | `samples`: TyvjYUpV22, 1KFuQknI34, Tco7s8pREl, in that order. `worlds`: the same 3, newest first, which is the same order. No other world is listed |
+| Home | "Walk a sample world" links `/w/TyvjYUpV22` and opens "Cozy house with garden"; the strip shows the 3 samples |
+| `/gallery` | One group, "Sample worlds", with 3 cards in that order, each thumbnail loaded (640 × 400) |
+| `/w/wLeiDFftn0`, `/w/3gQJnD3lHP` | "This world isn’t here" and "It may have been deleted, or the link is mistyped.", no canvas |
+| `/w/TyvjYUpV22`, fresh context | 20 cut-out PNGs and `backdrop.jpg`, all 200; bar: Objects, Pause motion, Reset positions, Help, Share link, Make your own; no Save positions, Delete world or Save & share |
+| `/w/1KFuQknI34`, fresh context | 12 cut-out PNGs and `backdrop.jpg`, all 200; the same bar |
+
+Console: two errors, the browser's "Failed to load resource" for the two expected 404s; no page errors.
+
+Spend: **$0.10** (2 understand, 1 point, 20 SAM and 2 backdrop calls at the design.md fixed estimates). The `usage` row for 2026-11-01 grew by exactly that, from 67,500 to 167,500 µ$, so there were no hidden retries, and the smoke added nothing. The 67,500 µ$ came before this run: two unlisted worlds titled "House with tree sun and rainbow" were made on the live site at 05:03 and 05:10 UTC, and this run left them alone. Live spend in this file: **$0.5725**.

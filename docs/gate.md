@@ -346,3 +346,9 @@ Version id **`c0a3e1aa-59c0-4811-9912-167ff4858e55`**, deployed with wrangler 4.
 Console: two errors, the browser's "Failed to load resource" for the two expected 404s; no page errors.
 
 Spend: **$0.10** (2 understand, 1 point, 20 SAM and 2 backdrop calls at the design.md fixed estimates). The `usage` row for 2026-11-01 grew by exactly that, from 67,500 to 167,500 µ$, so there were no hidden retries, and the smoke added nothing. The 67,500 µ$ came before this run: two unlisted worlds titled "House with tree sun and rainbow" were made on the live site at 05:03 and 05:10 UTC, and this run left them alone. Live spend in this file: **$0.5725**.
+
+## Taken offline
+
+Date: 2026-11-01, at the user's request. Deleted from the account (b48bb45c…f753): the Worker `sketch-world` (last version `c0a3e1aa-59c0-4811-9912-167ff4858e55`), R2 `sketch-world-assets` (all 76 objects first, then the bucket) and D1 `sketch-world-db` (5 worlds, including the 3 samples). The rate limiters went with the Worker. https://sketch-world.shamanthnp.workers.dev now replies 404, and `wrangler deployments list --name sketch-world` says the Worker does not exist (code 10007).
+
+Before deleting, the database was exported with `wrangler d1 export` and every R2 object was downloaded (76 of 76, none empty) to a local backup outside this repo. It is not published. The Worker, D1 database and R2 bucket of the author's earlier `undo-manual` project were deleted at the same time. R2 `wastatus-videos` was left alone. Running locally, as in the README, needs none of these.

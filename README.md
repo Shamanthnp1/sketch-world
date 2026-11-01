@@ -12,7 +12,7 @@ a link to it.
 
 Built during the hackathon: the Meta Global AI Developer Hackathon 2026 (solo, TypeScript on Cloudflare Workers).
 
-**Live demo:** https://sketch-world.shamanthnp.workers.dev. It may be taken offline after the event. Everything below
+**Hosted demo:** offline. The copy on workers.dev was taken down on 2026-11-01. Everything below
 runs on your own computer with your own Meta Model API key, and needs no Cloudflare account.
 
 - [What it looks like](#what-it-looks-like)
@@ -34,9 +34,10 @@ runs on your own computer with your own Meta Model API key, and needs no Cloudfl
 
 ## What it looks like
 
-The three sample worlds are live: [Cozy house with garden](https://sketch-world.shamanthnp.workers.dev/w/TyvjYUpV22),
-[House with tree and rainbow](https://sketch-world.shamanthnp.workers.dev/w/1KFuQknI34) and
-[House with Two Trees](https://sketch-world.shamanthnp.workers.dev/w/Tco7s8pREl).
+The screenshots show the three sample worlds, made from the drawings in [`examples/drawings/`](examples/drawings/):
+Cozy house with garden from `3.jpeg`, House with tree and rainbow from `2.jpeg` and House with Two Trees from
+`ms1.png`. They were on the hosted site, which is offline. To walk one, make it from the same drawing as in
+[Try it](#try-it).
 
 <table>
   <tr>
@@ -214,8 +215,8 @@ What to expect:
   Save positions and Delete world.
 - Saved worlds stay on your computer, in the local D1 and R2 under `.wrangler/state/`. Deleting `.wrangler/` deletes
   them and the local tables, so run step 4 again afterwards.
-- The local Gallery starts empty: the sample worlds are in the deployed site's database, and a new world is not
-  listed until it is approved. To list one of your local worlds, run
+- The local Gallery starts empty: the sample worlds were only in the hosted site's database, which is offline, and
+  a new world is not listed until it is approved. To list one of your local worlds, run
   `npx wrangler d1 execute sketch-world-db --local --command "UPDATE worlds SET listed = 1 WHERE id = '<id>'"`, with
   the 10 letters and digits after `/w/` as `<id>` (add `$env:CI='true';` or `CI=true` in front as in step 4).
 
@@ -292,7 +293,7 @@ on it is billed to the key you upload.
 2. Create a D1 database and an R2 bucket with your own names: `npx wrangler d1 create <your-db>` and
    `npx wrangler r2 bucket create <your-bucket>`.
 3. In `wrangler.jsonc`, put your database's name and the `database_id` that `d1 create` printed, and your bucket's
-   name. Set `SAMPLE_WORLD_IDS` to `""` (the ids in it are worlds on the author's site). The rate-limit
+   name. Set `SAMPLE_WORLD_IDS` to `""` (the ids in it were the author's sample worlds). The rate-limit
    `namespace_id`s (74031–74035) must be unique in your account; change them if they clash with ones you use.
 4. `npx wrangler d1 migrations apply <your-db> --remote`.
 5. `npm run build`.
@@ -448,8 +449,8 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 - **Rate limits** per client per 60 s: 6 for understand, point, backdrop and saving; 30 for segment. A client is an
   IPv4 address or an IPv6 /64, since one IPv6 user can pick a new address in their /64 for every request. Over the
   limit the Worker replies 429 with `Retry-After`. Size, type and field caps reply 400, 413 or 415.
-- **Daily cost cap:** each model call first reserves its estimate in D1. On the deployed site the cap is $5 per UTC
-  day (raised from $2 for judging week). When it is reached, the Worker skips the call and replies 503
+- **Daily cost cap:** each model call first reserves its estimate in D1. The cap is $5 per UTC day
+  (`DAILY_COST_CAP_USD` in `wrangler.jsonc`). When it is reached, the Worker skips the call and replies 503
   `{mode: "sample", reason: "daily"}`, and the Create page shows Sample_Mode ("No more new worlds today") with links
   to the sample worlds and the Gallery, which keep working.
 - **Per-visitor budget:** each client may spend at most $0.50 of that per UTC day (`PER_IP_DAILY_USD`, about 10–14
@@ -485,7 +486,7 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 ## Approving worlds for the Gallery
 
 A saved world gets `listed = 0`: anyone with its link can open it, but it is not in the Gallery or the Home strip.
-After you have looked at `/w/<id>`, approve it on the deployed database:
+After you have looked at `/w/<id>`, approve it on your deployed database:
 
 ```powershell
 $env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDATE worlds SET listed = 1 WHERE id = '<id>'"

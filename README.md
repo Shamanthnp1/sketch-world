@@ -125,15 +125,16 @@ lines.
    CI=true npx wrangler d1 migrations apply sketch-world-db --local           # bash
    ```
 
-5. **Build the site.** Vite writes the browser app to `dist/`, which `wrangler dev` serves.
+5. **Build the site.** Vite writes the browser app to `dist/`, which `wrangler dev` serves. Its warning that some
+   chunks are larger than 500 kB is expected: that is three.js, loaded only when a world opens.
 
    ```
    npm run build
    ```
 
 6. **Start the Worker.** This serves the site and `/api` on http://localhost:8787 with local D1, R2 and rate
-   limiters. Leave it running: it logs one line per model call (route, model, status and latency, never the key).
-   Stop it with Ctrl+C.
+   limiters. It is ready when it prints `Ready on http://127.0.0.1:8787`. Leave it running: it logs one line per
+   model call (route, model, status and latency, never the key). Stop it with Ctrl+C.
 
    ```powershell
    $env:CI='true'; npx wrangler dev    # PowerShell
@@ -172,9 +173,10 @@ What to expect:
 - The paper cards pop up out of the ground. The painted sky can arrive a few seconds later; until then the sky is a
   gradient.
 - Walk with W, A, S and D or the arrow keys, drag empty space to look around, and drag a card to move it. All the
-  controls are in [Controls](#controls), and Help shows them on your first visit.
+  controls are in [Controls](#controls), and Help shows them on your first visit. If a big card fills the view when
+  the world opens (the house in `2.jpeg` stands close to the start), walk back with S or turn with ← and →.
 - **Save & share** saves the world and shows a link such as `http://localhost:8787/w/AbCd123456`. Open it in another
-  tab or a private window: the same world opens, with the moves you saved. The tab that saved it also gets
+  tab or a private window: the same world opens, with the moves you saved. The browser that saved it also gets
   Save positions and Delete world.
 - Saved worlds stay on your computer, in the local D1 and R2 under `.wrangler/state/`. Deleting `.wrangler/` deletes
   them and the local tables, so run step 4 again afterwards.
@@ -192,11 +194,13 @@ What to expect:
   are estimates; Meta's bill is the real figure.
 - **Daily cap:** `DAILY_COST_CAP_USD` in `wrangler.jsonc`, $5 per UTC day, counted in the local D1.
 - **Per-visitor budget:** `PER_IP_DAILY_USD` in `wrangler.jsonc`, $0.50 per client per UTC day, about 10–14 worlds.
-  Locally every request comes from your own computer, so the whole local run counts as one client. After about
-  10–14 worlds in one UTC day, Create says "No more new worlds today" and "You've made a lot of worlds today".
+  Locally every request comes from your own computer (wrangler gives the Worker `127.0.0.1` as the client address),
+  so the whole local run counts as one client. After about 10–14 worlds in one UTC day, Create says "No more new
+  worlds today" and "You've made a lot of worlds today".
 - **To raise it for a long judging session**, without editing any tracked file, start `wrangler dev` with `--var`.
-  It overrides the value in `wrangler.jsonc` for that run only, and the binding list at startup shows the new value.
-  $2 is about 40–57 worlds. `--var DAILY_COST_CAP_USD:10` raises the daily cap the same way.
+  It overrides the value in `wrangler.jsonc` for that run only. The binding list at startup shows the value as
+  `"(hidden)"`; that is normal. $2 is about 40–57 worlds. `--var DAILY_COST_CAP_USD:10` raises the daily cap the same
+  way.
 
   ```powershell
   $env:CI='true'; npx wrangler dev --var PER_IP_DAILY_USD:2    # PowerShell
@@ -214,7 +218,7 @@ What to expect:
 
 | Command | What it does |
 |---|---|
-| `npm test` | About 620 tests: unit, fast-check property and Worker route tests on local D1 and R2 with a mocked Meta API. No key, no `.dev.vars` and no network calls |
+| `npm test` | About 620 tests in about 30 s: unit, fast-check property and Worker route tests on local D1 and R2 with a mocked Meta API. No key, no `.dev.vars` and no network calls. Without `.dev.vars` it warns "Missing required secrets: MODEL_API_KEY"; the tests use a fake key, so that is expected |
 | `npm run typecheck` | `tsc` for the browser code and the Worker |
 
 ### Live smoke
@@ -235,7 +239,7 @@ Replay mode re-runs saved replies with no calls: load `test/fixtures/meta/gate/l
 | What you see | What to do |
 |---|---|
 | `wrangler dev` says the address or port 8787 is in use | Use another port, `npx wrangler dev --port 8790`, and open http://localhost:8790 |
-| The Gallery says "The gallery couldn’t load", making a world fails, and `http://localhost:8787/api/gallery` replies 500 `{"error":"Internal error"}` | The local tables are missing: run step 4, then restart `wrangler dev` |
+| The Gallery says "The gallery couldn’t load", making a world fails, `http://localhost:8787/api/gallery` replies 500 `{"error":"Internal error"}`, and the log shows `[ERROR] {"route":"GET /api/gallery","error":"Error"}` | The local tables are missing: run step 4, then restart `wrangler dev` |
 | The world opens as one big card, "Your drawing", with "Sketch World couldn’t tell the things in your drawing apart", and the `wrangler dev` log shows `"status":401` or `"status":403` for `muse-spark-1.3` | The key is missing or wrong. Check that `.dev.vars` holds one line, `MODEL_API_KEY=` followed by the key, then stop and restart `wrangler dev` |
 | "No more new worlds today" | The local per-visitor budget ("You've made a lot of worlds today") or the daily cap is used up. Restart with `--var PER_IP_DAILY_USD:2` as in [Cost and limits](#cost-and-limits-when-running-locally), or wait for 00:00 UTC |
 | "Lots of worlds are being made right now" | A rate limit; wait a minute |

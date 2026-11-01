@@ -2,6 +2,8 @@
 
 Turn a drawing into a small paper pop-up world you can walk through.
 
+![Underwater Sea Friends, a sample world: crayon drawings of fish, a turtle, a starfish, a crab, coral and seaweed stand as paper cut-outs on a sandy floor under a painted sky](docs/screenshots/world-underwater.jpg)
+
 Sketch World takes a 2D drawing, either a photo of one on paper or one drawn in the browser, and turns it into a
 walkable, animated 3D paper pop-up world. Meta's Muse Spark lists the objects in the drawing, SAM 3.1 cuts each one
 out, and the cut-outs stand up as paper cards in a three.js diorama under a sky painted by Muse Image. Animals wander,
@@ -13,6 +15,7 @@ Built during the hackathon: the Meta Global AI Developer Hackathon 2026 (solo, T
 **Live demo:** https://sketch-world.shamanthnp.workers.dev. It may be taken offline after the event. Everything below
 runs on your own computer with your own Meta Model API key, and needs no Cloudflare account.
 
+- [What it looks like](#what-it-looks-like)
 - [Quick start](#quick-start)
 - [Run it locally](#run-it-locally): [prerequisites](#prerequisites), [step by step](#step-by-step),
   [try it](#try-it), [cost and limits](#cost-and-limits-when-running-locally), [tests](#tests-without-a-key),
@@ -28,6 +31,35 @@ runs on your own computer with your own Meta Model API key, and needs no Cloudfl
 - [Built during the hackathon](#built-during-the-hackathon)
 - [Models](#models)
 - [Licences](#licences)
+
+## What it looks like
+
+The three sample worlds are live: [Underwater Sea Friends](https://sketch-world.shamanthnp.workers.dev/w/wLeiDFftn0),
+[House with Two Trees](https://sketch-world.shamanthnp.workers.dev/w/Tco7s8pREl) and
+[Sunny Valley with River](https://sketch-world.shamanthnp.workers.dev/w/3gQJnD3lHP).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home.jpg" width="400" alt="The Home page: the heading Walk into your drawing, the buttons Make a world and Walk a sample world, and a pop-up book with a house, a tree and the sun"><br>Home: make a world, or walk a sample one.</td>
+    <td width="50%"><img src="docs/screenshots/create-pad.jpg" width="400" alt="The Draw here pad with a black line drawing of a house, a tree and the sun, and the Make my world button"><br>Draw here: a house, a tree and the sun on the pad.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/create-corners.jpg" width="400" alt="Mark the paper's corners: a photo of a crayon drawing on a wooden desk, with the paper's 4 corners tapped and numbered 1 to 4"><br>Or a photo of paper: tap its 4 corners and it is flattened on the device.</td>
+    <td width="50%"><img src="docs/screenshots/create-making.jpg" width="400" alt="Making your world: Reading your drawing is ticked and Cutting out 3 objects is in progress"><br>Making your world: Spark has listed 3 objects and SAM cuts them out.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/world-popup.gif" width="400" alt="Animation: the paper cards of House with Two Trees fold up out of the ground, then the trees sway"><br>The cards pop up out of the ground when the world opens.</td>
+    <td width="50%"><img src="docs/screenshots/world-house.jpg" width="400" alt="House with Two Trees: a house and two trees as paper cut-outs on green grass, with clouds and the sun under a painted sky"><br>House with Two Trees, under a sky painted by Muse Image.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/world-valley.jpg" width="400" alt="Sunny Valley with River: a tree, a river, two brown mountains, a small house and birds as paper cut-outs"><br>Sunny Valley with River: mountains, a river, a house and birds.</td>
+    <td width="50%"><img src="docs/screenshots/world-move-objects.jpg" width="400" alt="The Objects panel lists tree 1, tree 2, house, three clouds and the sun; the house is selected and its card is highlighted, with arrow buttons to move it"><br>Objects panel: pick the house, then move it with the arrows.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/gallery.jpg" width="400" alt="The Gallery with three sample world cards: Underwater Sea Friends, House with Two Trees and Sunny Valley with River"><br>The Gallery with the three sample worlds.</td>
+    <td width="50%"><img src="docs/screenshots/mobile-world.jpg" width="220" alt="Underwater Sea Friends on a phone: the HUD at the top, and on-screen buttons to walk forward and back and to turn"><br>On a phone: hold ↑ or ↓ to walk, tap ↺ or ↻ to turn.</td>
+  </tr>
+</table>
 
 ## Quick start
 
@@ -162,6 +194,8 @@ lines.
 3. Choose **Use the whole photo**: each example is the drawing itself, with no paper edges to mark. For a phone photo
    of paper, tap the paper's 4 corners instead. Use the whole photo takes any shape up to 4 : 1, so `ms1.png`
    (2.82 : 1) works as it is.
+
+   <img src="docs/screenshots/create-corners.jpg" width="480" alt="Mark the paper's corners: a photo of a crayon drawing on a wooden desk, with the paper's 4 corners tapped clockwise from the top left and numbered 1 to 4, and the Use these corners button">
 4. The first time, a privacy notice says where the drawing goes. Choose **Send my drawing**.
 
 Or choose **Start drawing** under **Draw here**, draw a house, a tree and the sun, and choose **Make my world**.

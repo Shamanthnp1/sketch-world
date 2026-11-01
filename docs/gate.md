@@ -4,6 +4,8 @@ Date: 2026-10-28
 
 Setup: local `npx wrangler dev` (after `npm run build`), probe page (`/?probe`) in Live mode, driven by `playwright-cli` in headless Chrome. Models `muse-spark-1.3` (understand) and `sam-3.1` (noun segments). `npm run smoke` showed `store: false` is accepted by Spark (echoed in the reply) and by Muse Image (accepted, not echoed). No prompt tuning in these runs.
 
+Since 2026-11-01, `2.jpeg`, `3.jpeg` and `ms1.png` are in [`examples/drawings/`](../examples/drawings/), published with the user's approval as byte-identical copies (their EXIF holds only orientation, resolution and pixel size: no GPS, device, date or author). `1.jpeg`, `ms2.png` and `ms3.png` stay private.
+
 ## Criteria
 
 - Spark lists ≥ 80% of the drawn objects.

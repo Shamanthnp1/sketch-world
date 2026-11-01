@@ -10,19 +10,258 @@ a link to it.
 
 Built during the hackathon: the Meta Global AI Developer Hackathon 2026 (solo, TypeScript on Cloudflare Workers).
 
-**Live demo:** https://sketch-world.shamanthnp.workers.dev
+**Live demo:** https://sketch-world.shamanthnp.workers.dev. It may be taken offline after the event. Everything below
+runs on your own computer with your own Meta Model API key, and needs no Cloudflare account.
 
+- [Quick start](#quick-start)
+- [Run it locally](#run-it-locally): [prerequisites](#prerequisites), [step by step](#step-by-step),
+  [try it](#try-it), [cost and limits](#cost-and-limits-when-running-locally), [tests](#tests-without-a-key),
+  [live smoke](#live-smoke), [the `?probe` page](#the-probe-dev-page), [troubleshooting](#troubleshooting)
+- [Deploy your own copy (optional)](#deploy-your-own-copy-optional)
 - [How it uses Meta models](#how-it-uses-meta-models)
 - [Day-1 gate results](#day-1-gate-results)
 - [Architecture](#architecture)
 - [Safety and privacy](#safety-and-privacy)
 - [Controls](#controls)
-- [Run, test and smoke](#run-test-and-smoke)
 - [Approving worlds for the Gallery](#approving-worlds-for-the-gallery)
 - [Known limits](#known-limits)
 - [Built during the hackathon](#built-during-the-hackathon)
 - [Models](#models)
 - [Licences](#licences)
+
+## Quick start
+
+You need Node.js 22.12 or newer, Git, a Meta Model API key and a browser with WebGL. Each world you make costs about
+$0.03–0.06, billed to the key. If a step fails, see [Step by step](#step-by-step) and
+[Troubleshooting](#troubleshooting).
+
+Windows (PowerShell):
+
+```powershell
+git clone https://github.com/Shamanthnp1/sketch-world.git; cd sketch-world
+npm install
+Copy-Item .dev.vars.example .dev.vars    # then open .dev.vars and put your key after MODEL_API_KEY=
+$env:CI='true'; npx wrangler d1 migrations apply sketch-world-db --local
+npm run build
+$env:CI='true'; npx wrangler dev
+```
+
+macOS or Linux (bash, zsh):
+
+```bash
+git clone https://github.com/Shamanthnp1/sketch-world.git && cd sketch-world
+npm install
+cp .dev.vars.example .dev.vars    # then open .dev.vars and put your key after MODEL_API_KEY=
+CI=true npx wrangler d1 migrations apply sketch-world-db --local
+npm run build
+CI=true npx wrangler dev
+```
+
+Open http://localhost:8787, choose **Make a world**, then **Choose a photo** under "Photo of a drawing", pick
+`examples/drawings/2.jpeg` and choose **Use the whole photo**.
+
+## Run it locally
+
+### Prerequisites
+
+- **Node.js 22.12 or newer**, with npm (it comes with Node). Node 22 LTS or 24 LTS is safest: Vite 8 needs 20.19+
+  or 22.12+, wrangler 4 needs 22+, and Vitest 5 supports 22.12+, 24 and 26+ but not 23 or 25. Check with `node -v`.
+- **Git.**
+- **A Meta Model API key.** During the hackathon, use the key from the hackathon's developer portal. Otherwise create
+  one in the Model API dashboard under API keys, as Meta's help page
+  [How do I create an API key?](https://dev.meta.ai/help/api-keys/create-api-key) describes. Every model call is
+  billed to the key's account.
+- **No Cloudflare account.** `wrangler dev` runs the Worker, D1 (SQLite), R2 and the rate limiters on your computer,
+  and the local commands below never ask for a login. This was checked on a fresh clone with an empty wrangler
+  config folder, so no saved login could be used.
+- **A browser with WebGL**, such as a current Chrome, Edge, Firefox or Safari with hardware acceleration on.
+- **The local Workers runtime** (workerd, installed by `npm install`) needs glibc 2.35 or newer on Linux (Ubuntu 22.04
+  or Debian 12 and later) and macOS 13.5 or newer with the Xcode command line tools (`xcode-select --install`) on a
+  Mac, per the [workerd README](https://github.com/cloudflare/workerd). These steps were tested on Windows 11 with
+  Node 24 and PowerShell 5.1.
+
+### Step by step
+
+Run these in a terminal. Where Windows PowerShell and bash differ, both are shown; Git Bash on Windows takes the bash
+lines.
+
+1. **Clone the repo** and go into it. This downloads the code and the example drawings.
+
+   ```
+   git clone https://github.com/Shamanthnp1/sketch-world.git
+   cd sketch-world
+   ```
+
+2. **Install the dependencies.** This puts Vite, wrangler with the local Workers runtime, three.js and the test tools
+   in `node_modules/`.
+
+   ```
+   npm install
+   ```
+
+3. **Add your key.** This makes `.dev.vars`, the file wrangler reads the Worker's secret from.
+
+   ```powershell
+   Copy-Item .dev.vars.example .dev.vars    # PowerShell
+   ```
+
+   ```bash
+   cp .dev.vars.example .dev.vars           # bash
+   ```
+
+   Open `.dev.vars` in a text editor (for example `notepad .dev.vars`, `open -e .dev.vars` or `nano .dev.vars`) and
+   put your key right after the `=`, on one line, with no spaces or quotes: `MODEL_API_KEY=<your key>`. The file
+   must hold only that line. It is gitignored; never commit it or paste it anywhere.
+
+4. **Create the local database tables.** This applies `migrations/0001_init.sql`, `0002_listed.sql` and
+   `0003_usage_ip.sql` to a local SQLite file under `.wrangler/state/`. Nothing touches the cloud. `CI=true` keeps
+   wrangler from asking questions.
+
+   ```powershell
+   $env:CI='true'; npx wrangler d1 migrations apply sketch-world-db --local    # PowerShell
+   ```
+
+   ```bash
+   CI=true npx wrangler d1 migrations apply sketch-world-db --local           # bash
+   ```
+
+5. **Build the site.** Vite writes the browser app to `dist/`, which `wrangler dev` serves.
+
+   ```
+   npm run build
+   ```
+
+6. **Start the Worker.** This serves the site and `/api` on http://localhost:8787 with local D1, R2 and rate
+   limiters. Leave it running: it logs one line per model call (route, model, status and latency, never the key).
+   Stop it with Ctrl+C.
+
+   ```powershell
+   $env:CI='true'; npx wrangler dev    # PowerShell
+   ```
+
+   ```bash
+   CI=true npx wrangler dev            # bash
+   ```
+
+7. **Open http://localhost:8787** in your browser.
+
+`npm run dev` (Vite alone) doesn't serve `/api`, so always use `wrangler dev`.
+
+### Try it
+
+1. Choose **Make a world**.
+2. Under **Photo of a drawing**, choose **Choose a photo** and pick a file from `examples/drawings/`:
+
+   | File | What is in it | Size |
+   |---|---|---|
+   | `2.jpeg` | A house, a tree, the sun, a rainbow, clouds and two bushes, in crayon on white | 740 × 545, 136 KB |
+   | `3.jpeg` | 21 things: a house, two trees, a fence, a campfire, a log, mushrooms, a rainbow, clouds and more | 740 × 725, 212 KB |
+   | `ms1.png` | A digital drawing of a house, two apple trees, three clouds and the sun | 3346 × 1186, 145 KB |
+
+3. Choose **Use the whole photo**: each example is the drawing itself, with no paper edges to mark. For a phone photo
+   of paper, tap the paper's 4 corners instead. Use the whole photo takes any shape up to 4 : 1, so `ms1.png`
+   (2.82 : 1) works as it is.
+4. The first time, a privacy notice says where the drawing goes. Choose **Send my drawing**.
+
+Or choose **Start drawing** under **Draw here**, draw a house, a tree and the sun, and choose **Make my world**.
+
+What to expect:
+
+- "Making your world…" shows three steps. The world opens about 10–25 s after you send the drawing. Spark's listing
+  takes about 5–15 s of that, then SAM cuts the objects out.
+- The paper cards pop up out of the ground. The painted sky can arrive a few seconds later; until then the sky is a
+  gradient.
+- Walk with W, A, S and D or the arrow keys, drag empty space to look around, and drag a card to move it. All the
+  controls are in [Controls](#controls), and Help shows them on your first visit.
+- **Save & share** saves the world and shows a link such as `http://localhost:8787/w/AbCd123456`. Open it in another
+  tab or a private window: the same world opens, with the moves you saved. The tab that saved it also gets
+  Save positions and Delete world.
+- Saved worlds stay on your computer, in the local D1 and R2 under `.wrangler/state/`. Deleting `.wrangler/` deletes
+  them and the local tables, so run step 4 again afterwards.
+- The local Gallery starts empty: the sample worlds are in the deployed site's database, and a new world is not
+  listed until it is approved. To list one of your local worlds, run
+  `npx wrangler d1 execute sketch-world-db --local --command "UPDATE worlds SET listed = 1 WHERE id = '<id>'"`, with
+  the 10 letters and digits after `/w/` as `<id>` (add `$env:CI='true';` or `CI=true` in front as in step 4).
+
+### Cost and limits when running locally
+
+- **Cost:** a world makes 1 Spark call to list the objects, 1 SAM call per kind of object (up to 12), sometimes 1
+  Spark pointing call and up to 4 SAM box calls, and 1 Muse Image call for the sky. At the Worker's fixed estimates
+  in `worker/cost.ts` (Spark $0.01, SAM $0.0025, Muse Image $0.01 a call; see
+  [Cost and time per world](#cost-and-time-per-world)) that is about $0.03–0.06 a world, billed to your key. These
+  are estimates; Meta's bill is the real figure.
+- **Daily cap:** `DAILY_COST_CAP_USD` in `wrangler.jsonc`, $5 per UTC day, counted in the local D1.
+- **Per-visitor budget:** `PER_IP_DAILY_USD` in `wrangler.jsonc`, $0.50 per client per UTC day, about 10–14 worlds.
+  Locally every request comes from your own computer, so the whole local run counts as one client. After about
+  10–14 worlds in one UTC day, Create says "No more new worlds today" and "You've made a lot of worlds today".
+- **To raise it for a long judging session**, without editing any tracked file, start `wrangler dev` with `--var`.
+  It overrides the value in `wrangler.jsonc` for that run only, and the binding list at startup shows the new value.
+  $2 is about 40–57 worlds. `--var DAILY_COST_CAP_USD:10` raises the daily cap the same way.
+
+  ```powershell
+  $env:CI='true'; npx wrangler dev --var PER_IP_DAILY_USD:2    # PowerShell
+  ```
+
+  ```bash
+  CI=true npx wrangler dev --var PER_IP_DAILY_USD:2           # bash
+  ```
+
+  Don't put these values in `.dev.vars`: the deploy command uploads every line of that file as a secret.
+- **Rate limits** per client per minute: 6 requests each to understand, point, backdrop and saving, and 30 to
+  segment. Over a limit the Worker replies 429; wait a minute and try again.
+
+### Tests without a key
+
+| Command | What it does |
+|---|---|
+| `npm test` | About 620 tests: unit, fast-check property and Worker route tests on local D1 and R2 with a mocked Meta API. No key, no `.dev.vars` and no network calls |
+| `npm run typecheck` | `tsc` for the browser code and the Worker |
+
+### Live smoke
+
+`npm run smoke` makes one real call each to Spark, SAM and Muse Image with the key in `.dev.vars`, about $0.02. It
+prints each call's model, status and latency, never the key. It saves the replies over
+`test/fixtures/meta/smoke-*.json`, so git shows those files as changed afterwards.
+
+### The `?probe` dev page
+
+http://localhost:8787/?probe is the tool the gate used. Live mode runs one drawing through understand and the noun
+segments only (no sky) and shows each object's masks, cut-outs, SAM latency, the total time and the estimated cost.
+Replay mode re-runs saved replies with no calls: load `test/fixtures/meta/gate/line-drawing.json` and
+`test/fixtures/images/line-drawing.png`, then use Open world to walk it.
+
+### Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| `wrangler dev` says the address or port 8787 is in use | Use another port, `npx wrangler dev --port 8790`, and open http://localhost:8790 |
+| The Gallery says "The gallery couldn’t load", making a world fails, and `http://localhost:8787/api/gallery` replies 500 `{"error":"Internal error"}` | The local tables are missing: run step 4, then restart `wrangler dev` |
+| The world opens as one big card, "Your drawing", with "Sketch World couldn’t tell the things in your drawing apart", and the `wrangler dev` log shows `"status":401` or `"status":403` for `muse-spark-1.3` | The key is missing or wrong. Check that `.dev.vars` holds one line, `MODEL_API_KEY=` followed by the key, then stop and restart `wrangler dev` |
+| "No more new worlds today" | The local per-visitor budget ("You've made a lot of worlds today") or the daily cap is used up. Restart with `--var PER_IP_DAILY_USD:2` as in [Cost and limits](#cost-and-limits-when-running-locally), or wait for 00:00 UTC |
+| "Lots of worlds are being made right now" | A rate limit; wait a minute |
+| wrangler asks a question, waits for input or wants to log in | Set `CI=true` as in steps 4 and 6. The local commands never need a login; only commands with `--remote` and `wrangler deploy` do |
+| The world stays blank, or "This world couldn’t open" | WebGL is off. Turn on hardware acceleration in the browser's settings, or try another browser |
+| Code changes don't show | Run `npm run build` again and restart `wrangler dev`; it serves the `dist/` you built |
+| On Linux, `GLIBC_2.35 not found` | The local Workers runtime needs a newer glibc (Ubuntu 22.04 or Debian 12 and later) |
+| npm prints `EBADENGINE`, or `npm test` fails to start | Node is too old; install Node 22.12 or newer |
+
+## Deploy your own copy (optional)
+
+Only for someone with a Cloudflare account who wants their own public copy; judging doesn't need it. Every world made
+on it is billed to the key you upload.
+
+1. `npx wrangler login`.
+2. Create a D1 database and an R2 bucket with your own names: `npx wrangler d1 create <your-db>` and
+   `npx wrangler r2 bucket create <your-bucket>`.
+3. In `wrangler.jsonc`, put your database's name and the `database_id` that `d1 create` printed, and your bucket's
+   name. Set `SAMPLE_WORLD_IDS` to `""` (the ids in it are worlds on the author's site). The rate-limit
+   `namespace_id`s (74031–74035) must be unique in your account; change them if they clash with ones you use.
+4. `npx wrangler d1 migrations apply <your-db> --remote`.
+5. `npm run build`.
+6. `npx wrangler deploy --secrets-file .dev.vars`. This uploads every line of `.dev.vars` as a secret, so it must
+   hold only `MODEL_API_KEY`.
+
+The site is then at `https://sketch-world.<your-subdomain>.workers.dev`.
 
 ## How it uses Meta models
 
@@ -69,16 +308,17 @@ Before each call the Worker reserves a fixed estimate against the day's budget. 
 
 Understand and point retry once when a reply fails the schema check, and a retry reserves again.
 
-- **Cost:** about $0.03–0.05 per world. The gate drawings needed 5–12 noun calls ($0.0225–0.04 with understand),
-  plus $0.01 for the sky. The point and box fallbacks add at most $0.02.
-- **Time:** about 10–22 s from sending the drawing to the last cut-out (8.9–22.1 s in the gate runs). Spark's
+- **Cost:** about $0.03–0.06 per world; the sample worlds cost $0.03–0.06. The gate drawings needed 5–12 noun calls
+  ($0.0225–0.04 with understand), plus $0.01 for the sky. The point and box fallbacks add at most $0.02.
+- **Time:** about 10–25 s from sending the drawing to the last cut-out (8.9–22.1 s in the gate runs). Spark's
   understand call is the longest step: 5.3–5.6 s in the re-run, 15.7 s on the 21-object drawing.
 
 ## Day-1 gate results
 
 Before building the 3D world, the model chain had to pass a gate on six of the author's own drawings. The run used
-the local `?probe` page in Live mode, understand plus noun SAM only, with no prompt tuning. The drawings are private
-and are not in this repo. Full notes per drawing: [docs/gate.md](docs/gate.md).
+the local `?probe` page in Live mode, understand plus noun SAM only, with no prompt tuning. Three of the drawings,
+`2.jpeg`, `3.jpeg` and `ms1.png`, are in [examples/drawings/](examples/drawings/); the other three are private and not
+in this repo. Full notes per drawing: [docs/gate.md](docs/gate.md).
 
 | Drawing | Kind | Objects | Listed by Spark | Clean SAM cut-out | Time | Cost |
 |---|---|---|---|---|---|---|
@@ -139,6 +379,7 @@ flowchart LR
 | `migrations` | The D1 schema |
 | `scripts/smoke.mjs` | The live smoke test |
 | `test` | Unit, property (fast-check) and Worker tests, with fixtures |
+| `examples/drawings` | Three gate drawings to try the app with |
 | `docs/gate.md` | The Day-1 gate results |
 
 The visual rules for the pages are in [DESIGN.md](DESIGN.md).
@@ -203,32 +444,6 @@ The visual rules for the pages are in [DESIGN.md](DESIGN.md).
 - **Save & share** saves the world and gives you a link. On the device that saved it you also get **Save positions**
   and **Delete world**. Anyone else can move things around, but can't save them.
 
-## Run, test and smoke
-
-You need Node.js 22.12 or newer and a Meta Model API key.
-
-```powershell
-npm install
-Copy-Item .dev.vars.example .dev.vars   # then put your key after MODEL_API_KEY= (never commit .dev.vars)
-npx wrangler d1 migrations apply sketch-world-db --local   # creates the local D1 tables
-npm run build
-$env:CI='true'; npx wrangler dev
-```
-
-Open http://localhost:8787. `CI=true` keeps wrangler from asking questions. `npm run dev` (Vite alone) does not serve
-`/api`, so use `wrangler dev`.
-
-| Command | What it does | Live calls |
-|---|---|---|
-| `npm test` | About 540 tests: unit, fast-check property tests, and Worker route tests on local D1 and R2 with a mocked Meta API | None, fixtures only |
-| `npm run typecheck` | `tsc` for the browser code and the Worker | None |
-| `npm run smoke` | One real call each to Spark, SAM and Muse Image; prints status and latency, never the key | About $0.02 |
-
-**The `?probe` dev page** (http://localhost:8787/?probe) is the tool the gate used. It runs one drawing through
-understand and the noun segments, and shows each object's masks and cut-outs, SAM latency, the total time and the
-estimated cost. Replay mode re-runs saved replies with no calls: load `test/fixtures/meta/gate/line-drawing.json` and
-`test/fixtures/images/line-drawing.png`, then use Open world to walk it.
-
 ## Approving worlds for the Gallery
 
 A saved world gets `listed = 0`: anyone with its link can open it, but it is not in the Gallery or the Home strip.
@@ -245,7 +460,7 @@ $env:CI='true'; npx wrangler d1 execute sketch-world-db --remote --command "UPDA
 ```
 
 `<id>` is the 10 letters and digits after `/w/`. The worlds in `SAMPLE_WORLD_IDS` (`wrangler.jsonc`) are listed
-whatever their `listed` value.
+whatever their `listed` value. For a local run, use `--local` instead of `--remote` (see [Try it](#try-it)).
 
 ## Known limits
 

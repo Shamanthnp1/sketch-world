@@ -2,7 +2,7 @@
 
 Turn a drawing into a small paper pop-up world you can walk through.
 
-![Underwater Sea Friends, a sample world: crayon drawings of fish, a turtle, a starfish, a crab, coral and seaweed stand as paper cut-outs on a sandy floor under a painted sky](docs/screenshots/world-underwater.jpg)
+![Cozy house with garden, a sample world with 20 paper cut-outs from examples/drawings/3.jpeg: a crayon house with a chimney, a rainbow, the sun, clouds, a tree, a fence and a red mushroom stand under a painted sky](docs/screenshots/world-garden.jpg)
 
 Sketch World takes a 2D drawing, either a photo of one on paper or one drawn in the browser, and turns it into a
 walkable, animated 3D paper pop-up world. Meta's Muse Spark lists the objects in the drawing, SAM 3.1 cuts each one
@@ -34,9 +34,9 @@ runs on your own computer with your own Meta Model API key, and needs no Cloudfl
 
 ## What it looks like
 
-The three sample worlds are live: [Underwater Sea Friends](https://sketch-world.shamanthnp.workers.dev/w/wLeiDFftn0),
-[House with Two Trees](https://sketch-world.shamanthnp.workers.dev/w/Tco7s8pREl) and
-[Sunny Valley with River](https://sketch-world.shamanthnp.workers.dev/w/3gQJnD3lHP).
+The three sample worlds are live: [Cozy house with garden](https://sketch-world.shamanthnp.workers.dev/w/TyvjYUpV22),
+[House with tree and rainbow](https://sketch-world.shamanthnp.workers.dev/w/1KFuQknI34) and
+[House with Two Trees](https://sketch-world.shamanthnp.workers.dev/w/Tco7s8pREl).
 
 <table>
   <tr>
@@ -52,12 +52,12 @@ The three sample worlds are live: [Underwater Sea Friends](https://sketch-world.
     <td width="50%"><img src="docs/screenshots/world-house.jpg" width="400" alt="House with Two Trees: a house and two trees as paper cut-outs on green grass, with clouds and the sun under a painted sky"><br>House with Two Trees, under a sky painted by Muse Image.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/world-valley.jpg" width="400" alt="Sunny Valley with River: a tree, a river, two brown mountains, a small house and birds as paper cut-outs"><br>Sunny Valley with River: mountains, a river, a house and birds.</td>
+    <td width="50%"><img src="docs/screenshots/world-rainbow.jpg" width="400" alt="House with tree and rainbow: a crayon house with a chimney, a tree, a rainbow, the sun and a cloud as paper cut-outs, seen from low down under a painted sky"><br>House with tree and rainbow, from examples/drawings/2.jpeg.</td>
     <td width="50%"><img src="docs/screenshots/world-move-objects.jpg" width="400" alt="The Objects panel lists tree 1, tree 2, house, three clouds and the sun; the house is selected and its card is highlighted, with arrow buttons to move it"><br>Objects panel: pick the house, then move it with the arrows.</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/gallery.jpg" width="400" alt="The Gallery with three sample world cards: Underwater Sea Friends, House with Two Trees and Sunny Valley with River"><br>The Gallery with the three sample worlds.</td>
-    <td width="50%"><img src="docs/screenshots/mobile-world.jpg" width="220" alt="Underwater Sea Friends on a phone: the HUD at the top, and on-screen buttons to walk forward and back and to turn"><br>On a phone: hold ↑ or ↓ to walk, tap ↺ or ↻ to turn.</td>
+    <td width="50%"><img src="docs/screenshots/gallery.jpg" width="400" alt="The Gallery with three sample world cards: Cozy house with garden, House with tree and rainbow and House with Two Trees"><br>The Gallery with the three sample worlds.</td>
+    <td width="50%"><img src="docs/screenshots/mobile-world.jpg" width="220" alt="Cozy house with garden on a phone: the HUD at the top, the rainbow, the sun and a tree in the middle, and on-screen buttons to walk forward and back and to turn"><br>On a phone: hold ↑ or ↓ to walk, tap ↺ or ↻ to turn.</td>
   </tr>
 </table>
 
